@@ -78,6 +78,9 @@ namespace VisualScripting.Core.Parsers
         
         // Для поддержки потока выполнения (Execution Flow - if/else, последовательность)
         private string? _lastExecutableNodeId;
+        
+        // ID первой исполняемой ноды в текущей ветке (нужно для if/else)
+        private string? _firstExecutableNodeIdInBranch;
 
         public GraphBuilderWalker(GraphData graph)
         {
@@ -95,7 +98,6 @@ namespace VisualScripting.Core.Parsers
             
             if (_lastExecutableNodeId != null)
             {
-                // Ищем предыдущую ноду и подключаем к ней текущую в порт "next"
                 var prevNode = _graph.Nodes.Find(n => n.Id == _lastExecutableNodeId);
                 if (prevNode != null)
                 {
@@ -103,13 +105,15 @@ namespace VisualScripting.Core.Parsers
                 }
             }
             
+            // Запоминаем первую ноду в ветке (для if/else)
+            _firstExecutableNodeIdInBranch ??= node.Id;
+            
             _lastExecutableNodeId = node.Id;
             _lastNodeId = node.Id;
         }
 
         public override void VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node)
         {
-            // Например: int a = 5;
             var declaration = node.Declaration;
             var type = declaration.Type.ToString();
             
@@ -135,7 +139,6 @@ namespace VisualScripting.Core.Parsers
 
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
-            // Проверка на transform.position = ...
             if (node.Left.ToString() == "transform.position")
             {
                 var setNode = new NodeData { Id = NextId(), Type = NodeType.TransformPositionSet };
@@ -147,7 +150,6 @@ namespace VisualScripting.Core.Parsers
                 return;
             }
 
-            // Обычное присваивание переменной (a = 5)
             var assignNode = new NodeData
             {
                 Id = NextId(),
@@ -158,7 +160,6 @@ namespace VisualScripting.Core.Parsers
             Visit(node.Right);
             if (_lastNodeId != null) assignNode.InputConnections["value"] = _lastNodeId;
 
-            // Если это выражение является самостоятельным стейтментом
             if (node.Parent is ExpressionStatementSyntax)
             {
                 AddExecutableNode(assignNode);
@@ -170,8 +171,25 @@ namespace VisualScripting.Core.Parsers
             }
         }
 
+        /// <summary>
+        /// Вызывается при встрече идентификатора (имени переменной).
+        /// Создаёт ноду чтения переменной только если идентификатор действительно является 
+        /// обращением к переменной, а не частью вызова метода, типа или MemberAccess.
+        /// </summary>
         public override void VisitIdentifierName(IdentifierNameSyntax node)
         {
+            // Пропускаем идентификаторы, являющиеся частью вызовов методов, 
+            // обращений к членам (MemberAccess), объявлений типов и т.д.
+            if (node.Parent is MemberAccessExpressionSyntax ||
+                node.Parent is InvocationExpressionSyntax ||
+                node.Parent is QualifiedNameSyntax ||
+                node.Parent is ObjectCreationExpressionSyntax ||
+                node.Parent is VariableDeclarationSyntax ||
+                node.Parent is TypeArgumentListSyntax)
+            {
+                return;
+            }
+
             var varReadNode = new NodeData
             {
                 Id = NextId(),
@@ -193,49 +211,32 @@ namespace VisualScripting.Core.Parsers
             
             AddExecutableNode(ifNode);
             
-            // Запоминаем ID if-ноды, чтобы ветки true/false могли к ней подключиться
             var currentIfNodeId = ifNode.Id;
 
-            // Парсим блок True
-            _lastExecutableNodeId = null; // Сбрасываем контекст для новой ветки
+            // Парсим блок True: сбрасываем оба указателя для отслеживания начала ветки
+            _lastExecutableNodeId = null;
+            _firstExecutableNodeIdInBranch = null;
             Visit(node.Statement);
-            if (_lastExecutableNodeId != null) 
+            if (_firstExecutableNodeIdInBranch != null) 
             {
-                ifNode.ExecutionFlow["true"] = GetFirstNodeInBranch(_lastExecutableNodeId);
+                ifNode.ExecutionFlow["true"] = _firstExecutableNodeIdInBranch;
             }
 
             // Парсим блок False (если есть)
             if (node.Else != null)
             {
                 _lastExecutableNodeId = null;
+                _firstExecutableNodeIdInBranch = null;
                 Visit(node.Else.Statement);
-                if (_lastExecutableNodeId != null) 
+                if (_firstExecutableNodeIdInBranch != null) 
                 {
-                    ifNode.ExecutionFlow["false"] = GetFirstNodeInBranch(_lastExecutableNodeId);
+                    ifNode.ExecutionFlow["false"] = _firstExecutableNodeIdInBranch;
                 }
             }
 
             // Возвращаем фокус на ifNode для последующих инструкций
             _lastExecutableNodeId = currentIfNodeId;
-        }
-
-        private string GetFirstNodeInBranch(string lastNodeInBranchId)
-        {
-            // В идеале здесь нужно найти самую первую ноду в ветке выполнения, 
-            // проходя по связям назад. Для упрощения MVP предположим, что мы 
-            // парсим последовательно, и первая нода после If - это начало ветки.
-            // В реальной системе потребуется более сложный трекинг начал веток.
-            // Сейчас возвращаем просто последнюю добавленную в ветке ноду 
-            // (в рамках MVP это работает для однострочных блоков if).
-            return lastNodeInBranchId; 
-        }
-
-        /// <summary>
-        /// Вызывается при встрече выражения-утверждения (например: UnityEngine.Debug.Log(1 + 2);)
-        /// </summary>
-        public override void VisitExpressionStatement(ExpressionStatementSyntax node)
-        {
-            base.VisitExpressionStatement(node);
+            _firstExecutableNodeIdInBranch = null;
         }
 
         /// <summary>
@@ -243,7 +244,6 @@ namespace VisualScripting.Core.Parsers
         /// </summary>
         public override void VisitInvocationExpression(InvocationExpressionSyntax node)
         {
-            // Проверка на Debug.Log
             if (node.Expression.ToString() == "UnityEngine.Debug.Log" || node.Expression.ToString() == "Debug.Log")
             {
                 var debugNode = new NodeData
@@ -260,7 +260,6 @@ namespace VisualScripting.Core.Parsers
                 
                 AddExecutableNode(debugNode);
             }
-            // Проверка на new Vector3() - technically ObjectCreationExpression, but let's handle new Vector3 properly in its own method
             else
             {
                 base.VisitInvocationExpression(node);
@@ -327,15 +326,12 @@ namespace VisualScripting.Core.Parsers
 
             var binaryNode = new NodeData { Id = NextId(), Type = type };
             
-            // Обходим левую часть выражения (например, "1" в "1 + 2")
             Visit(node.Left);
             string? leftId = _lastNodeId;
             
-            // Обходим правую часть выражения (например, "2" в "1 + 2")
             Visit(node.Right);
             string? rightId = _lastNodeId;
 
-            // Подключаем левую и правую части в порты
             if (leftId != null) binaryNode.InputConnections["left"] = leftId;
             if (rightId != null) binaryNode.InputConnections["right"] = rightId;
 
@@ -345,6 +341,7 @@ namespace VisualScripting.Core.Parsers
 
         /// <summary>
         /// Вызывается при встрече литерала (числа, строки, булевого значения).
+        /// Поддерживает int, float, double, string, bool.
         /// </summary>
         public override void VisitLiteralExpression(LiteralExpressionSyntax node)
         {
@@ -352,7 +349,7 @@ namespace VisualScripting.Core.Parsers
             string value = node.Token.ValueText;
 
             if (node.Token.Value is int) type = NodeType.VariableInt;
-            else if (node.Token.Value is float) type = NodeType.VariableFloat;
+            else if (node.Token.Value is float or double) type = NodeType.VariableFloat;
             else if (node.Token.Value is string) type = NodeType.VariableString;
             else if (node.Token.Value is bool) type = NodeType.VariableBool;
             else

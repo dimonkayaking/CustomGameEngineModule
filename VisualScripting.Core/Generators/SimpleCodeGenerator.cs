@@ -43,15 +43,19 @@ namespace VisualScripting.Core.Generators
 
             foreach (var startNode in startNodes)
             {
-                GenerateExecutionFlow(startNode.Id, nodes, sb, 0);
+                var visited = new HashSet<string>();
+                GenerateExecutionFlow(startNode.Id, nodes, sb, 0, visited);
             }
 
             return sb.ToString();
         }
 
-        private void GenerateExecutionFlow(string nodeId, Dictionary<string, NodeData> allNodes, StringBuilder sb, int indentLevel)
+        private void GenerateExecutionFlow(string nodeId, Dictionary<string, NodeData> allNodes, StringBuilder sb, int indentLevel, HashSet<string> visited)
         {
             if (!allNodes.TryGetValue(nodeId, out var node)) return;
+            
+            // Защита от циклических ссылок в графе (предотвращает StackOverflow)
+            if (!visited.Add(nodeId)) return;
 
             string indent = new string(' ', indentLevel * 4);
             
@@ -67,43 +71,43 @@ namespace VisualScripting.Core.Generators
                     {
                         sb.AppendLine($"{indent}{node.ValueType} {node.Value};");
                     }
-                    if (node.ExecutionFlow.TryGetValue("next", out var nextVarDecl)) GenerateExecutionFlow(nextVarDecl, allNodes, sb, indentLevel);
+                    if (node.ExecutionFlow.TryGetValue("next", out var nextVarDecl)) GenerateExecutionFlow(nextVarDecl, allNodes, sb, indentLevel, visited);
                     break;
 
                 case NodeType.VariableAssignment:
                     string? assignVal = GetInputValue(node, "value", allNodes);
                     sb.AppendLine($"{indent}{node.Value} = {assignVal};");
-                    if (node.ExecutionFlow.TryGetValue("next", out var nextAssign)) GenerateExecutionFlow(nextAssign, allNodes, sb, indentLevel);
+                    if (node.ExecutionFlow.TryGetValue("next", out var nextAssign)) GenerateExecutionFlow(nextAssign, allNodes, sb, indentLevel, visited);
                     break;
 
                 case NodeType.TransformPositionSet:
                     string? posVal = GetInputValue(node, "value", allNodes);
                     sb.AppendLine($"{indent}transform.position = {posVal};");
-                    if (node.ExecutionFlow.TryGetValue("next", out var nextSet)) GenerateExecutionFlow(nextSet, allNodes, sb, indentLevel);
+                    if (node.ExecutionFlow.TryGetValue("next", out var nextSet)) GenerateExecutionFlow(nextSet, allNodes, sb, indentLevel, visited);
                     break;
 
                 case NodeType.DebugLog:
                     string? message = GetInputValue(node, "message", allNodes);
                     sb.AppendLine($"{indent}UnityEngine.Debug.Log({message});");
-                    if (node.ExecutionFlow.TryGetValue("next", out var nextLog)) GenerateExecutionFlow(nextLog, allNodes, sb, indentLevel);
+                    if (node.ExecutionFlow.TryGetValue("next", out var nextLog)) GenerateExecutionFlow(nextLog, allNodes, sb, indentLevel, visited);
                     break;
 
                 case NodeType.IfStatement:
                     string? condition = GetInputValue(node, "condition", allNodes);
                     sb.AppendLine($"{indent}if ({condition})");
                     sb.AppendLine($"{indent}{{");
-                    if (node.ExecutionFlow.TryGetValue("true", out var trueNode)) GenerateExecutionFlow(trueNode, allNodes, sb, indentLevel + 1);
+                    if (node.ExecutionFlow.TryGetValue("true", out var trueNode)) GenerateExecutionFlow(trueNode, allNodes, sb, indentLevel + 1, visited);
                     sb.AppendLine($"{indent}}}");
                     
                     if (node.ExecutionFlow.TryGetValue("false", out var falseNode))
                     {
                         sb.AppendLine($"{indent}else");
                         sb.AppendLine($"{indent}{{");
-                        GenerateExecutionFlow(falseNode, allNodes, sb, indentLevel + 1);
+                        GenerateExecutionFlow(falseNode, allNodes, sb, indentLevel + 1, visited);
                         sb.AppendLine($"{indent}}}");
                     }
                     
-                    if (node.ExecutionFlow.TryGetValue("next", out var nextIf)) GenerateExecutionFlow(nextIf, allNodes, sb, indentLevel);
+                    if (node.ExecutionFlow.TryGetValue("next", out var nextIf)) GenerateExecutionFlow(nextIf, allNodes, sb, indentLevel, visited);
                     break;
             }
         }
