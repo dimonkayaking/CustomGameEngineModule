@@ -7,15 +7,33 @@ namespace VisualScripting.Core.Models
     /// </summary>
     public enum NodeType
     {
+        // Базовые типы
         VariableInt,
         VariableFloat,
         VariableString,
         VariableBool,
+        
+        // Математика
         MathAdd,
         MathSubtract,
         MathMultiply,
         MathDivide,
-        DebugLog
+        
+        // Встроенные методы
+        DebugLog,
+
+        // Переменные (Объявление, Чтение, Присваивание)
+        VariableDeclaration,
+        VariableRead,
+        VariableAssignment,
+
+        // Unity Типы
+        Vector3Create,
+        TransformPositionRead,
+        TransformPositionSet,
+
+        // Управляющие конструкции
+        IfStatement
     }
 
     /// <summary>
@@ -34,9 +52,21 @@ namespace VisualScripting.Core.Models
         public NodeType Type { get; set; }
 
         /// <summary>
-        /// Строковое значение для нод-литералов (переменных).
+        /// Строковое значение для нод-литералов (переменных) или Имя переменной.
         /// </summary>
         public string Value { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Тип переменной (используется для нод VariableDeclaration, например "int", "float").
+        /// </summary>
+        public string ValueType { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Ссылки на следующие исполняемые ноды (Flow Control / Белые провода).
+        /// Ключ - порт выхода (например, "next", "true", "false").
+        /// Значение - ID следующей ноды для выполнения.
+        /// </summary>
+        public Dictionary<string, string> ExecutionFlow { get; set; } = new Dictionary<string, string>();
 
         /// <summary>
         /// Словарь входящих соединений.

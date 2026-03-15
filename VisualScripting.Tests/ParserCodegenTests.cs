@@ -17,7 +17,11 @@ namespace VisualScripting.Tests
             var generator = new SimpleCodeGenerator();
 
             // Действие: Парсинг C# кода в граф нод (Act)
-            GraphData graph = parser.Parse(inputCode);
+            ParseResult parseResult = parser.Parse(inputCode);
+            GraphData graph = parseResult.Graph;
+            
+            // Проверка на отсутствие ошибок парсинга
+            Assert.False(parseResult.HasErrors);
             
             // Проверки результатов парсинга (Assert parsing result)
             Assert.Equal(4, graph.Nodes.Count); // Должно быть 4 ноды: 2 числа, сложение и Debug.Log
