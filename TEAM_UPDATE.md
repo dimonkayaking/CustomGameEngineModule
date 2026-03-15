@@ -85,29 +85,3 @@ if (result.HasErrors) {
 
 2. **[Средний] Создание мусорных нод VariableRead**
    Метод `VisitIdentifierName` создавал ноду `VariableRead` для **каждого** идентификатора в коде, включая имена методов и типов. Добавлена фильтрация по контексту родительского узла (`MemberAccessExpression`, `InvocationExpression`, `ObjectCreationExpression` и др.).
-
-3. **[Низкий] Литералы double игнорировались**
-   Числа без суффикса `f` (например, `1.5`) Roslyn интерпретирует как `double`. Раньше такие литералы молча пропускались. Теперь `double` обрабатывается наравне с `float`.
-
-4. **[Низкий] Защита от циклических графов**
-   В кодогенераторе добавлен `HashSet<string> visited`, предотвращающий бесконечную рекурсию при обходе потока выполнения. Это важно для Разработчика №1: если пользователь случайно создаст циклическую связь между нодами в UI — генератор не упадёт.
-
-5. **[Косметика] Удалён пустой override `VisitExpressionStatement`**, переведены все комментарии на русский.
-
----
-
-## 📊 Текущее покрытие тестами
-
-| Тест | Что проверяет |
-|---|---|
-| `TestParseAndGenerate` | Базовый цикл: парсинг `Debug.Log(1 + 2)` → граф → генерация кода |
-| `TestVariableDeclarationAndAssignment` | Объявление, присваивание, чтение переменных + Execution Flow |
-| `TestVariableDeclarationWithoutInitializer` | Объявление переменной без значения (`int b;`) |
-| `TestUnityTransformAndVector3` | Парсинг и генерация `transform.position = new Vector3(...)` |
-| `TestIfStatement` | Базовый if/else |
-| `TestIfWithMultipleStatements` | If-блок с несколькими инструкциями (регрессия бага №1) |
-| `TestDoubleLiteral` | Парсинг литерала `1.5` без суффикса `f` |
-| `TestCyclicGraphDoesNotCrash` | Циклический граф не вызывает StackOverflow |
-| `TestSyntaxError` | Некорректный код возвращает `HasErrors = true` |
-
-Все **9 тестов проходят**, сборка без ошибок и предупреждений.
