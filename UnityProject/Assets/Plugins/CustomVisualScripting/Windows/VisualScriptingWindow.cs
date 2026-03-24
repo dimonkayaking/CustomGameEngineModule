@@ -7,6 +7,7 @@ using UnityEngine.UIElements;
 using GraphProcessor;
 using CustomVisualScripting.Integration;
 using CustomVisualScripting.Integration.Models;
+using CustomVisualScripting.Windows.Views;
 using CustomToolbar = CustomVisualScripting.Windows.Views.ToolbarView;
 
 namespace CustomVisualScripting.Windows
