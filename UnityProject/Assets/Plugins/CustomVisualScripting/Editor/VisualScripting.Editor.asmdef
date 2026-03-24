@@ -1,9 +1,0 @@
-{
-    "name": "VisualScripting.Editor",
-    "references": [
-        "CustomVisualScripting",
-        "VisualScripting.Runtime",
-        "com.warwlock.node-graph-processor"
-    ],
-    "includePlatforms": ["Editor"]
-}

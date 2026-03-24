@@ -1,7 +1,0 @@
-{
-    "name": "VisualScripting.Runtime",
-    "references": [
-        "CustomVisualScripting",
-        "com.warwlock.node-graph-processor"
-    ]
-}

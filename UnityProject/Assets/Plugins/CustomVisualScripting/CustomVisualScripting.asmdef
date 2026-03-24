@@ -1,6 +1,0 @@
-{
-    "name": "CustomVisualScripting",
-    "references": [
-        "com.warwlock.node-graph-processor"
-    ]
-}

@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 using GraphProcessor;
 using CustomVisualScripting.Integration;
 using CustomVisualScripting.Integration.Models;
-using CustomVisualScripting.Windows.Views;
+using CustomToolbar = CustomVisualScripting.Windows.Views.ToolbarView;
 
 namespace CustomVisualScripting.Windows
 {
@@ -18,7 +18,7 @@ namespace CustomVisualScripting.Windows
         private VisualElement _graphContainer;
         
         private CodeEditorView _codeEditor;
-        private ToolbarView _toolbar;
+        private CustomToolbar _toolbar;
         private ErrorPanel _errorPanel;
         
         [MenuItem("Tools/Visual Scripting")]
@@ -42,7 +42,7 @@ namespace CustomVisualScripting.Windows
             
             var root = rootVisualElement;
             
-            _toolbar = new ToolbarView();
+            _toolbar = new CustomToolbar();
             _toolbar.ParseButton.clicked += OnParse;
             _toolbar.GenerateButton.clicked += OnGenerate;
             _toolbar.SaveButton.clicked += OnSave;
@@ -57,7 +57,7 @@ namespace CustomVisualScripting.Windows
             splitView.Add(_codeEditor);
             
             _graphContainer = new VisualElement();
-            _graphContainer.style.backgroundColor = new StyleColor(new UnityEngine.Color(0.22f, 0.22f, 0.22f));
+            _graphContainer.style.backgroundColor = new StyleColor(new Color(0.22f, 0.22f, 0.22f));
             _graphContainer.style.flexGrow = 1;
             
             var placeholder = new Label("Здесь будет GraphView");
