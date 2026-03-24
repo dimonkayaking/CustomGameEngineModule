@@ -1,11 +1,8 @@
 {
     "name": "CustomVisualScripting",
-    "rootNamespace": "CustomVisualScripting",
     "references": [
         "com.alelievr.node-graph-processor"
     ],
-    "precompiledReferences": [
-        "Core/VisualScripting.Core.dll"
-    ],
-    "overrideReferences": true
+    "includePlatforms": [],
+    "excludePlatforms": []
 }

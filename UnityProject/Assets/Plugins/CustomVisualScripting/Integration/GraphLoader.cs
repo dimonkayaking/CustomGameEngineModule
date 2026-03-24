@@ -1,5 +1,6 @@
 using UnityEngine;
 using CustomVisualScripting.Integration.Models;
+using CustomVisualScripting.Runtime.Assets;
 
 namespace CustomVisualScripting.Integration
 {
