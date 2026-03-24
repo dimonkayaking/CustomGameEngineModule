@@ -1,13 +1,11 @@
-using System;
-using UnityEngine;
 using GraphProcessor;
-using VisualScripting.Core.Models;
+using UnityEngine;
 using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Comparison
 {
     [System.Serializable, NodeMenuItem("Comparison/Equal")]
-    public class EqualNode : BaseNode
+    public class EqualNode : CustomBaseNode  // ← изменено
     {
         public override NodeType NodeType => NodeType.CompareEqual;
 
@@ -21,5 +19,17 @@ namespace CustomVisualScripting.Editor.Nodes.Comparison
         public bool result;
 
         public override string name => "Equal (==)";
+        
+        protected override void Process()
+        {
+            if (left != null && right != null)
+            {
+                result = left.Equals(right);
+            }
+            else
+            {
+                result = left == null && right == null;
+            }
+        }
     }
 }
