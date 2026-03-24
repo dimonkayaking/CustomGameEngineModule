@@ -2,6 +2,6 @@
     "name": "VisualScripting.Runtime",
     "references": [
         "CustomVisualScripting",
-        "com.alelievr.node-graph-processor"
+        "com.warwlock.node-graph-processor"
     ]
 }

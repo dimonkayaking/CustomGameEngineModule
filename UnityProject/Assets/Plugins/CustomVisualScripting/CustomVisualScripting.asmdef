@@ -1,6 +1,6 @@
 {
     "name": "CustomVisualScripting",
     "references": [
-        "com.warwlock.nodegraphprocessor"
+        "com.warwlock.node-graph-processor"
     ]
 }

@@ -3,7 +3,7 @@
     "references": [
         "CustomVisualScripting",
         "VisualScripting.Runtime",
-        "com.alelievr.node-graph-processor"
+        "com.warwlock.node-graph-processor"
     ],
     "includePlatforms": ["Editor"]
 }
