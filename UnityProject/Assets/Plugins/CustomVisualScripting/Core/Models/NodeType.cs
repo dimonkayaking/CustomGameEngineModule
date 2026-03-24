@@ -33,6 +33,18 @@ namespace VisualScripting.Core.Models
         // Переменные
         VariableGet,
         VariableSet,
-        VariableDeclaration
+        VariableDeclaration,
+        
+        // Дополнительные (для совместимости с NodeExecutor)
+        VariableInt,
+        VariableFloat,
+        VariableString,
+        VariableBool,
+        VariableRead,
+        VariableAssignment,
+        IfStatement,
+        TransformPositionRead,
+        TransformPositionSet,
+        Vector3Create
     }
 }
