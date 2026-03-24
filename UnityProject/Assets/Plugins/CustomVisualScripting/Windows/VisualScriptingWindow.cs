@@ -8,7 +8,6 @@ using GraphProcessor;
 using CustomVisualScripting.Integration;
 using CustomVisualScripting.Integration.Models;
 using CustomVisualScripting.Windows.Views;
-using CustomVisualScripting.Editor.Nodes;
 
 namespace CustomVisualScripting.Windows
 {
