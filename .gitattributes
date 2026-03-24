@@ -1,0 +1,39 @@
+# Автоматически нормализовать концовки строк для текстовых файлов
+* text=auto
+
+# Явно указать типы файлов
+*.cs text diff=csharp
+*.json text
+*.md text
+*.txt text
+*.xml text
+*.uss text
+*.asmdef text
+
+# Бинарные файлы (не трогать)
+*.dll binary
+*.png binary
+*.asset binary
+*.unity binary
+*.meta binary
+*.jpg binary
+*.jpeg binary
+*.psd binary
+
+# Unity специфичные
+*.unity binary
+*.prefab binary
+*.asset binary
+*.meta binary
+*.mat binary
+*.controller binary
+*.anim binary
+*.fbx binary
+*.blend binary
+
+# Исходники Core
+*.csproj text
+*.sln text
+
+# Документация
+*.md text diff=markdown
