@@ -151,7 +151,7 @@ namespace CustomVisualScripting.Windows
             {
                 foreach (var nodeView in _graphView.nodeViews)
                 {
-                    if (nodeView.nodeTarget is CustomBaseNode customNode)
+                    if (nodeView.nodeTarget is CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode customNode)
                     {
                         var visualNode = _currentGraph.VisualNodes.FirstOrDefault(v => v.NodeId == customNode.NodeId);
                         if (visualNode != null)
@@ -250,7 +250,7 @@ namespace CustomVisualScripting.Windows
                 {
                     foreach (var nodeView in _graphView.nodeViews)
                     {
-                        if (nodeView.nodeTarget is CustomBaseNode customNode)
+                        if (nodeView.nodeTarget is CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode customNode)
                         {
                             var visualNode = _currentGraph.VisualNodes.FirstOrDefault(v => v.NodeId == customNode.NodeId);
                             if (visualNode != null)
@@ -296,35 +296,33 @@ namespace CustomVisualScripting.Windows
             }
         }
         
-        private CustomBaseNode CreateNodeFromData(NodeData data)
+        private CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode CreateNodeFromData(NodeData data)
         {
             if (data == null) return null;
             
-            CustomBaseNode node = data.Type switch
+            return data.Type switch
             {
-                NodeType.LiteralInt => new IntNode(),
-                NodeType.LiteralFloat => new FloatNode(),
-                NodeType.LiteralBool => new BoolNode(),
-                NodeType.LiteralString => new StringNode(),
-                NodeType.MathAdd => new AddNode(),
-                NodeType.MathSubtract => new SubtractNode(),
-                NodeType.MathMultiply => new MultiplyNode(),
-                NodeType.MathDivide => new DivideNode(),
-                NodeType.CompareEqual => new EqualNode(),
-                NodeType.CompareGreater => new GreaterNode(),
-                NodeType.CompareLess => new LessNode(),
-                NodeType.FlowIf => new IfNode(),
-                NodeType.DebugLog => new DebugLogNode(),
-                NodeType.UnityGetPosition => new GetPositionNode(),
-                NodeType.UnitySetPosition => new SetPositionNode(),
-                NodeType.UnityVector3 => new Vector3CreateNode(),
-                NodeType.VariableGet => new GetVariableNode(),
-                NodeType.VariableSet => new SetVariableNode(),
-                NodeType.VariableDeclaration => new VariableDeclarationNode(),
+                NodeType.LiteralInt => new CustomVisualScripting.Editor.Nodes.Literals.IntNode(),
+                NodeType.LiteralFloat => new CustomVisualScripting.Editor.Nodes.Literals.FloatNode(),
+                NodeType.LiteralBool => new CustomVisualScripting.Editor.Nodes.Literals.BoolNode(),
+                NodeType.LiteralString => new CustomVisualScripting.Editor.Nodes.Literals.StringNode(),
+                NodeType.MathAdd => new CustomVisualScripting.Editor.Nodes.Math.AddNode(),
+                NodeType.MathSubtract => new CustomVisualScripting.Editor.Nodes.Math.SubtractNode(),
+                NodeType.MathMultiply => new CustomVisualScripting.Editor.Nodes.Math.MultiplyNode(),
+                NodeType.MathDivide => new CustomVisualScripting.Editor.Nodes.Math.DivideNode(),
+                NodeType.CompareEqual => new CustomVisualScripting.Editor.Nodes.Comparison.EqualNode(),
+                NodeType.CompareGreater => new CustomVisualScripting.Editor.Nodes.Comparison.GreaterNode(),
+                NodeType.CompareLess => new CustomVisualScripting.Editor.Nodes.Comparison.LessNode(),
+                NodeType.FlowIf => new CustomVisualScripting.Editor.Nodes.Flow.IfNode(),
+                NodeType.DebugLog => new CustomVisualScripting.Editor.Nodes.Debug.DebugLogNode(),
+                NodeType.UnityGetPosition => new CustomVisualScripting.Editor.Nodes.Unity.GetPositionNode(),
+                NodeType.UnitySetPosition => new CustomVisualScripting.Editor.Nodes.Unity.SetPositionNode(),
+                NodeType.UnityVector3 => new CustomVisualScripting.Editor.Nodes.Unity.Vector3CreateNode(),
+                NodeType.VariableGet => new CustomVisualScripting.Editor.Nodes.Variables.GetVariableNode(),
+                NodeType.VariableSet => new CustomVisualScripting.Editor.Nodes.Variables.SetVariableNode(),
+                NodeType.VariableDeclaration => new CustomVisualScripting.Editor.Nodes.Variables.VariableDeclarationNode(),
                 _ => null
             };
-            
-            return node;
         }
         
         private void OnDestroy()
