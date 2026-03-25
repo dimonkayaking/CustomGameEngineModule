@@ -139,21 +139,6 @@ namespace CustomVisualScripting.Editor.Windows
             string path = EditorUtility.SaveFilePanel("Сохранить граф", Application.dataPath, "graph.json", "json");
             if (string.IsNullOrEmpty(path)) return;
             
-            if (_graphView != null && _currentGraph.VisualNodes != null)
-            {
-                foreach (var nodeView in _graphView.nodeViews)
-                {
-                    if (nodeView.nodeTarget is CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode customNode)
-                    {
-                        var visualNode = _currentGraph.VisualNodes.FirstOrDefault(v => v.NodeId == customNode.NodeId);
-                        if (visualNode != null)
-                        {
-                            visualNode.Position = nodeView.GetPosition().position;
-                        }
-                    }
-                }
-            }
-            
             if (GraphSaver.SaveToJson(_currentGraph, path))
             {
                 _toolbar.SetStatusSuccess($"Сохранено: {Path.GetFileName(path)}");
@@ -207,186 +192,29 @@ namespace CustomVisualScripting.Editor.Windows
                 return;
             }
             
-            try
-            {
-                CleanupGraph();
-                
-                _internalGraph = ScriptableObject.CreateInstance<BaseGraph>();
-                
-                var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                
-                foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
-                {
-                    var node = CreateNodeFromData(nodeData);
-                    if (node != null)
-                    {
-                        if (guidField != null)
-                        {
-                            var currentGuid = guidField.GetValue(node);
-                            if (currentGuid == null || string.IsNullOrEmpty(currentGuid.ToString()))
-                            {
-                                guidField.SetValue(node, nodeData.Id);
-                            }
-                        }
-                        _internalGraph.AddNode(node);
-                    }
-                }
-                
-                if (_internalGraph.nodes.Count == 0)
-                {
-                    var placeholder = new Label("Не удалось создать узлы для отображения");
-                    placeholder.style.marginTop = 20;
-                    placeholder.style.marginLeft = 10;
-                    placeholder.style.color = Color.yellow;
-                    _graphContainer.Add(placeholder);
-                    return;
-                }
-                
-                _graphView = new BaseGraphView(this);
-                _graphView.Initialize(_internalGraph);
-                _graphView.style.flexGrow = 1;
-                
-                if (_currentGraph.VisualNodes != null && _currentGraph.VisualNodes.Count > 0)
-                {
-                    foreach (var nodeView in _graphView.nodeViews)
-                    {
-                        if (nodeView.nodeTarget is CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode customNode)
-                        {
-                            var visualNode = _currentGraph.VisualNodes.FirstOrDefault(v => v.NodeId == customNode.NodeId);
-                            if (visualNode != null)
-                            {
-                                nodeView.SetPosition(new Rect(visualNode.Position.x, visualNode.Position.y, 100, 50));
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    int index = 0;
-                    foreach (var nodeView in _graphView.nodeViews)
-                    {
-                        float x = 100 + (index % 5) * 200;
-                        float y = 100 + (index / 5) * 150;
-                        nodeView.SetPosition(new Rect(x, y, 100, 50));
-                        index++;
-                    }
-                }
-                
-                _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
-                _graphView.FrameAll();
-                
-                _graphContainer.Add(_graphView);
-                
-                _graphView.schedule.Execute(() => {
-                    _graphView.FrameAll();
-                    _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
-                }).ExecuteLater(50);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[VS] Ошибка создания графа: {e.Message}\n{e.StackTrace}");
-                
-                var errorLabel = new Label($"Ошибка отображения графа: {e.Message}");
-                errorLabel.style.color = Color.red;
-                errorLabel.style.marginTop = 20;
-                errorLabel.style.marginLeft = 10;
-                errorLabel.style.whiteSpace = WhiteSpace.Normal;
-                _graphContainer.Add(errorLabel);
-            }
-        }
-        
-        private CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode CreateNodeFromData(NodeData data)
-        {
-            if (data == null) return null;
+            // Текстовое отображение графа
+            var info = new VisualElement();
+            info.style.marginTop = 10;
+            info.style.marginLeft = 10;
+            info.style.flexGrow = 1;
             
-            CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode node = null;
+            var label = new Label($"Граф содержит {_currentGraph.LogicGraph.Nodes.Count} нод");
+            label.style.color = Color.white;
+            label.style.fontSize = 14;
+            label.style.marginBottom = 10;
+            info.Add(label);
             
-            try
+            foreach (var node in _currentGraph.LogicGraph.Nodes)
             {
-                switch (data.Type)
-                {
-                    case NodeType.LiteralInt:
-                        node = new CustomVisualScripting.Editor.Nodes.Literals.IntNode();
-                        break;
-                    case NodeType.LiteralFloat:
-                        node = new CustomVisualScripting.Editor.Nodes.Literals.FloatNode();
-                        break;
-                    case NodeType.LiteralBool:
-                        node = new CustomVisualScripting.Editor.Nodes.Literals.BoolNode();
-                        break;
-                    case NodeType.LiteralString:
-                        node = new CustomVisualScripting.Editor.Nodes.Literals.StringNode();
-                        break;
-                    case NodeType.MathAdd:
-                        node = new CustomVisualScripting.Editor.Nodes.Math.AddNode();
-                        break;
-                    case NodeType.MathSubtract:
-                        node = new CustomVisualScripting.Editor.Nodes.Math.SubtractNode();
-                        break;
-                    case NodeType.MathMultiply:
-                        node = new CustomVisualScripting.Editor.Nodes.Math.MultiplyNode();
-                        break;
-                    case NodeType.MathDivide:
-                        node = new CustomVisualScripting.Editor.Nodes.Math.DivideNode();
-                        break;
-                    case NodeType.CompareEqual:
-                        node = new CustomVisualScripting.Editor.Nodes.Comparison.EqualNode();
-                        break;
-                    case NodeType.CompareGreater:
-                        node = new CustomVisualScripting.Editor.Nodes.Comparison.GreaterNode();
-                        break;
-                    case NodeType.CompareLess:
-                        node = new CustomVisualScripting.Editor.Nodes.Comparison.LessNode();
-                        break;
-                    case NodeType.FlowIf:
-                        node = new CustomVisualScripting.Editor.Nodes.Flow.IfNode();
-                        break;
-                    case NodeType.DebugLog:
-                        node = new CustomVisualScripting.Editor.Nodes.Debug.DebugLogNode();
-                        break;
-                    case NodeType.UnityGetPosition:
-                        node = new CustomVisualScripting.Editor.Nodes.Unity.GetPositionNode();
-                        break;
-                    case NodeType.UnitySetPosition:
-                        node = new CustomVisualScripting.Editor.Nodes.Unity.SetPositionNode();
-                        break;
-                    case NodeType.UnityVector3:
-                        node = new CustomVisualScripting.Editor.Nodes.Unity.Vector3CreateNode();
-                        break;
-                    case NodeType.VariableGet:
-                        node = new CustomVisualScripting.Editor.Nodes.Variables.GetVariableNode();
-                        break;
-                    case NodeType.VariableSet:
-                        node = new CustomVisualScripting.Editor.Nodes.Variables.SetVariableNode();
-                        break;
-                    case NodeType.VariableDeclaration:
-                        node = new CustomVisualScripting.Editor.Nodes.Variables.VariableDeclarationNode();
-                        break;
-                }
-                
-                if (node != null)
-                {
-                    node.NodeId = data.Id;
-                    
-                    if (!string.IsNullOrEmpty(data.Value))
-                    {
-                        if (node is CustomVisualScripting.Editor.Nodes.Literals.IntNode intNode && int.TryParse(data.Value, out int intVal))
-                            intNode.intValue = intVal;
-                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.FloatNode floatNode && float.TryParse(data.Value, out float floatVal))
-                            floatNode.floatValue = floatVal;
-                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.BoolNode boolNode && bool.TryParse(data.Value, out bool boolVal))
-                            boolNode.boolValue = boolVal;
-                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.StringNode stringNode)
-                            stringNode.stringValue = data.Value;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[VS] Ошибка создания узла {data.Type}: {e.Message}");
+                var color = GraphConverter.GetNodeColor(node.Type);
+                var nodeLabel = new Label($"  • {GraphConverter.GetNodeDisplayName(node.Type)} (ID: {node.Id})");
+                nodeLabel.style.color = color;
+                nodeLabel.style.marginLeft = 20;
+                nodeLabel.style.marginBottom = 2;
+                info.Add(nodeLabel);
             }
             
-            return node;
+            _graphContainer.Add(info);
         }
         
         private void OnDestroy()
