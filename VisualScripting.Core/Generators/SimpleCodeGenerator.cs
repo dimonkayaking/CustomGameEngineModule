@@ -22,7 +22,6 @@ namespace VisualScripting.Core.Generators
             sb.AppendLine("    {");
             
             var nodeVariables = new Dictionary<string, string>();
-            var processedNodes = new HashSet<string>();
             int tempCounter = 0;
             
             // Сначала обрабатываем литералы
@@ -47,7 +46,6 @@ namespace VisualScripting.Core.Generators
                         sb.AppendLine($"        string {varName} = \"{node.Value}\";");
                         break;
                 }
-                processedNodes.Add(node.Id);
             }
             
             // Обрабатываем операционные узлы
