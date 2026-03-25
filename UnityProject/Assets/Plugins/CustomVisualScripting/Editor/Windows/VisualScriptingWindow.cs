@@ -358,6 +358,9 @@ namespace CustomVisualScripting.Editor.Windows
                 {
                     node.NodeId = data.Id;
                     
+                    // Вызываем Enable для инициализации GUID
+                    node.Enable();
+                    
                     if (!string.IsNullOrEmpty(data.Value))
                     {
                         if (node is CustomVisualScripting.Editor.Nodes.Literals.IntNode intNode && int.TryParse(data.Value, out int intVal))
