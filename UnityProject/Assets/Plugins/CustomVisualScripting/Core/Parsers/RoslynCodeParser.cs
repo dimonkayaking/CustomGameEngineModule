@@ -1,10 +1,6 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using VisualScripting.Core.Models;
 using System.Collections.Generic;
-using System.Linq;
-using System;
+using System.Text.RegularExpressions;
 
 namespace VisualScripting.Core.Parsers
 {
@@ -18,37 +14,95 @@ namespace VisualScripting.Core.Parsers
             var graph = new GraphData();
             var errors = new List<string>();
             
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                errors.Add("Код пуст");
+                return new ParseResult { Graph = graph, Errors = errors };
+            }
+            
             try
             {
-                var tree = CSharpSyntaxTree.ParseText(code);
-                var root = tree.GetCompilationUnitRoot();
+                // Парсим литералы: int x = 10;
+                var literalPattern = @"(\w+)\s+(\w+)\s*=\s*(\d+|""[^""]*""|true|false);";
+                var literalMatches = Regex.Matches(code, literalPattern);
                 
-                // Получаем все диагностические ошибки
-                var diagnostics = tree.GetDiagnostics();
-                foreach (var diagnostic in diagnostics)
+                foreach (Match match in literalMatches)
                 {
-                    if (diagnostic.Severity == DiagnosticSeverity.Error)
+                    var type = match.Groups[1].Value;
+                    var value = match.Groups[3].Value;
+                    
+                    NodeType nodeType;
+                    if (type == "int") nodeType = NodeType.LiteralInt;
+                    else if (type == "float") nodeType = NodeType.LiteralFloat;
+                    else if (type == "string") nodeType = NodeType.LiteralString;
+                    else if (type == "bool") nodeType = NodeType.LiteralBool;
+                    else continue;
+                    
+                    graph.Nodes.Add(new NodeData
                     {
-                        errors.Add(diagnostic.GetMessage());
-                    }
+                        Id = GenerateId(),
+                        Type = nodeType,
+                        Value = value,
+                        ValueType = type
+                    });
                 }
                 
-                // Находим все методы
-                var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
+                // Парсим операции: a + b
+                var operationPattern = @"(\w+)\s*=\s*(\w+)\s*([\+\-\*/])\s*(\w+);";
+                var operationMatches = Regex.Matches(code, operationPattern);
                 
-                foreach (var method in methods)
+                foreach (Match match in operationMatches)
                 {
-                    ParseMethod(method, graph);
+                    var op = match.Groups[3].Value;
+                    NodeType opType = op switch
+                    {
+                        "+" => NodeType.MathAdd,
+                        "-" => NodeType.MathSubtract,
+                        "*" => NodeType.MathMultiply,
+                        "/" => NodeType.MathDivide,
+                        _ => NodeType.MathAdd
+                    };
+                    
+                    graph.Nodes.Add(new NodeData
+                    {
+                        Id = GenerateId(),
+                        Type = opType,
+                        Value = "",
+                        ValueType = ""
+                    });
                 }
                 
-                // Если нет методов, ищем глобальные операторы (топ-левел)
-                var globalStatements = root.DescendantNodes().OfType<GlobalStatementSyntax>();
-                foreach (var statement in globalStatements)
+                // Парсим условие if
+                var ifPattern = @"if\s*\((.*?)\)";
+                var ifMatches = Regex.Matches(code, ifPattern);
+                
+                foreach (Match match in ifMatches)
                 {
-                    ParseStatement(statement.Statement, graph);
+                    graph.Nodes.Add(new NodeData
+                    {
+                        Id = GenerateId(),
+                        Type = NodeType.FlowIf,
+                        Value = match.Groups[1].Value,
+                        ValueType = ""
+                    });
+                }
+                
+                // Парсим Debug.Log
+                var debugPattern = @"Debug\.Log\((.*?)\)";
+                var debugMatches = Regex.Matches(code, debugPattern);
+                
+                foreach (Match match in debugMatches)
+                {
+                    graph.Nodes.Add(new NodeData
+                    {
+                        Id = GenerateId(),
+                        Type = NodeType.DebugLog,
+                        Value = match.Groups[1].Value,
+                        ValueType = ""
+                    });
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 errors.Add($"Ошибка парсинга: {ex.Message}");
             }
@@ -60,240 +114,9 @@ namespace VisualScripting.Core.Parsers
             };
         }
         
-        private void ParseMethod(MethodDeclarationSyntax method, GraphData graph)
-        {
-            var body = method.Body;
-            if (body == null) return;
-            
-            foreach (var statement in body.Statements)
-            {
-                ParseStatement(statement, graph);
-            }
-        }
-        
-        private void ParseStatement(StatementSyntax statement, GraphData graph)
-        {
-            switch (statement)
-            {
-                case LocalDeclarationStatementSyntax localDecl:
-                    ParseLocalDeclaration(localDecl, graph);
-                    break;
-                    
-                case ExpressionStatementSyntax exprStmt:
-                    ParseExpression(exprStmt.Expression, graph);
-                    break;
-                    
-                case IfStatementSyntax ifStmt:
-                    ParseIfStatement(ifStmt, graph);
-                    break;
-                    
-                case ReturnStatementSyntax returnStmt:
-                    ParseReturnStatement(returnStmt, graph);
-                    break;
-            }
-        }
-        
-        private void ParseLocalDeclaration(LocalDeclarationStatementSyntax decl, GraphData graph)
-        {
-            foreach (var variable in decl.Declaration.Variables)
-            {
-                if (variable.Initializer != null)
-                {
-                    ParseExpression(variable.Initializer.Value, graph);
-                }
-            }
-        }
-        
-        private void ParseExpression(ExpressionSyntax expression, GraphData graph)
-        {
-            switch (expression)
-            {
-                case LiteralExpressionSyntax literal:
-                    ParseLiteral(literal, graph);
-                    break;
-                    
-                case BinaryExpressionSyntax binary:
-                    ParseBinaryExpression(binary, graph);
-                    break;
-                    
-                case IdentifierNameSyntax identifier:
-                    ParseIdentifier(identifier, graph);
-                    break;
-                    
-                case InvocationExpressionSyntax invocation:
-                    ParseInvocation(invocation, graph);
-                    break;
-            }
-        }
-        
-        private void ParseLiteral(LiteralExpressionSyntax literal, GraphData graph)
-        {
-            var value = literal.Token.ValueText;
-            var type = literal.Kind().ToString();
-            
-            NodeType nodeType;
-            if (literal.Kind() == SyntaxKind.NumericLiteralExpression)
-            {
-                if (value.Contains("."))
-                    nodeType = NodeType.LiteralFloat;
-                else
-                    nodeType = NodeType.LiteralInt;
-            }
-            else if (literal.Kind() == SyntaxKind.StringLiteralExpression)
-            {
-                nodeType = NodeType.LiteralString;
-            }
-            else if (literal.Kind() == SyntaxKind.TrueLiteralExpression || 
-                     literal.Kind() == SyntaxKind.FalseLiteralExpression)
-            {
-                nodeType = NodeType.LiteralBool;
-            }
-            else
-            {
-                return;
-            }
-            
-            var node = new NodeData
-            {
-                Id = GenerateId(),
-                Type = nodeType,
-                Value = value,
-                ValueType = GetTypeName(nodeType)
-            };
-            graph.Nodes.Add(node);
-        }
-        
-        private void ParseBinaryExpression(BinaryExpressionSyntax binary, GraphData graph)
-        {
-            // Парсим левую и правую части
-            ParseExpression(binary.Left, graph);
-            ParseExpression(binary.Right, graph);
-            
-            // Определяем тип операции
-            NodeType operationType;
-            switch (binary.OperatorToken.Kind())
-            {
-                case SyntaxKind.PlusToken:
-                    operationType = NodeType.MathAdd;
-                    break;
-                case SyntaxKind.MinusToken:
-                    operationType = NodeType.MathSubtract;
-                    break;
-                case SyntaxKind.AsteriskToken:
-                    operationType = NodeType.MathMultiply;
-                    break;
-                case SyntaxKind.SlashToken:
-                    operationType = NodeType.MathDivide;
-                    break;
-                case SyntaxKind.EqualsEqualsToken:
-                    operationType = NodeType.CompareEqual;
-                    break;
-                case SyntaxKind.GreaterThanToken:
-                    operationType = NodeType.CompareGreater;
-                    break;
-                case SyntaxKind.LessThanToken:
-                    operationType = NodeType.CompareLess;
-                    break;
-                default:
-                    return;
-            }
-            
-            var operationNode = new NodeData
-            {
-                Id = GenerateId(),
-                Type = operationType,
-                Value = "",
-                ValueType = ""
-            };
-            graph.Nodes.Add(operationNode);
-        }
-        
-        private void ParseIdentifier(IdentifierNameSyntax identifier, GraphData graph)
-        {
-            var node = new NodeData
-            {
-                Id = GenerateId(),
-                Type = NodeType.VariableGet,
-                Value = identifier.Identifier.Text,
-                ValueType = "variable"
-            };
-            graph.Nodes.Add(node);
-        }
-        
-        private void ParseInvocation(InvocationExpressionSyntax invocation, GraphData graph)
-        {
-            if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-            {
-                var methodName = memberAccess.Name.Identifier.Text;
-                
-                if (methodName == "Log" && memberAccess.Expression.ToString() == "Debug")
-                {
-                    var node = new NodeData
-                    {
-                        Id = GenerateId(),
-                        Type = NodeType.DebugLog,
-                        Value = "",
-                        ValueType = ""
-                    };
-                    graph.Nodes.Add(node);
-                    
-                    // Парсим аргументы
-                    foreach (var arg in invocation.ArgumentList.Arguments)
-                    {
-                        ParseExpression(arg.Expression, graph);
-                    }
-                }
-            }
-        }
-        
-        private void ParseIfStatement(IfStatementSyntax ifStmt, GraphData graph)
-        {
-            // Узел условия
-            var ifNode = new NodeData
-            {
-                Id = GenerateId(),
-                Type = NodeType.FlowIf,
-                Value = "",
-                ValueType = ""
-            };
-            graph.Nodes.Add(ifNode);
-            
-            // Парсим условие
-            ParseExpression(ifStmt.Condition, graph);
-            
-            // Парсим тело
-            ParseStatement(ifStmt.Statement, graph);
-            
-            // Парсим else если есть
-            if (ifStmt.Else != null)
-            {
-                ParseStatement(ifStmt.Else.Statement, graph);
-            }
-        }
-        
-        private void ParseReturnStatement(ReturnStatementSyntax returnStmt, GraphData graph)
-        {
-            if (returnStmt.Expression != null)
-            {
-                ParseExpression(returnStmt.Expression, graph);
-            }
-        }
-        
         private string GenerateId()
         {
             return $"node_{_nodeCounter++}";
-        }
-        
-        private string GetTypeName(NodeType type)
-        {
-            return type switch
-            {
-                NodeType.LiteralInt => "int",
-                NodeType.LiteralFloat => "float",
-                NodeType.LiteralString => "string",
-                NodeType.LiteralBool => "bool",
-                _ => "unknown"
-            };
         }
     }
 }
