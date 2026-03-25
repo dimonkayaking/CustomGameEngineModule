@@ -1,4 +1,4 @@
-using VisualScripting.Core.Models;
+﻿using VisualScripting.Core.Models;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -84,7 +84,7 @@ namespace VisualScripting.Core.Parsers
                     };
                     graph.Nodes.Add(opNode);
                     
-                    // Создаем связи от переменных к операции
+                    // Связи от переменных к операции
                     if (_variables.ContainsKey(leftVar))
                     {
                         graph.Edges.Add(new EdgeData
