@@ -16,6 +16,7 @@ using CustomVisualScripting.Editor.Nodes.Flow;
 using CustomVisualScripting.Editor.Nodes.Debug;
 using CustomVisualScripting.Editor.Nodes.Unity;
 using CustomVisualScripting.Editor.Nodes.Variables;
+using VisualScripting.Core.Models;
 using CustomToolbar = CustomVisualScripting.Windows.Views.ToolbarView;
 
 namespace CustomVisualScripting.Windows
@@ -146,7 +147,6 @@ namespace CustomVisualScripting.Windows
             string path = EditorUtility.SaveFilePanel("Сохранить граф", Application.dataPath, "graph.json", "json");
             if (string.IsNullOrEmpty(path)) return;
             
-            // Сохраняем позиции узлов из визуального графа
             if (_graphView != null && _currentGraph.VisualNodes != null)
             {
                 foreach (var nodeView in _graphView.nodeViews)
@@ -218,13 +218,10 @@ namespace CustomVisualScripting.Windows
             
             try
             {
-                // Очищаем старый граф
                 CleanupGraph();
                 
-                // Создаем новый граф
                 _internalGraph = ScriptableObject.CreateInstance<BaseGraph>();
                 
-                // Добавляем узлы из данных
                 foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
                 {
                     var node = CreateNodeFromData(nodeData);
@@ -235,7 +232,6 @@ namespace CustomVisualScripting.Windows
                     }
                 }
                 
-                // Если нет узлов в графе
                 if (_internalGraph.nodes.Count == 0)
                 {
                     var placeholder = new Label("Не удалось создать узлы для отображения");
@@ -246,12 +242,10 @@ namespace CustomVisualScripting.Windows
                     return;
                 }
                 
-                // Создаем визуальное представление
                 _graphView = new BaseGraphView();
                 _graphView.Initialize(_internalGraph);
                 _graphView.style.flexGrow = 1;
                 
-                // Устанавливаем позиции узлов
                 if (_currentGraph.VisualNodes != null && _currentGraph.VisualNodes.Count > 0)
                 {
                     foreach (var nodeView in _graphView.nodeViews)
@@ -269,7 +263,6 @@ namespace CustomVisualScripting.Windows
                 }
                 else
                 {
-                    // Располагаем узлы сеткой
                     int index = 0;
                     foreach (var nodeView in _graphView.nodeViews)
                     {
@@ -280,13 +273,11 @@ namespace CustomVisualScripting.Windows
                     }
                 }
                 
-                // Центрируем граф
                 _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
                 _graphView.FrameAll();
                 
                 _graphContainer.Add(_graphView);
                 
-                // Принудительное обновление
                 _graphView.schedule.Execute(() => {
                     _graphView.FrameAll();
                     _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
