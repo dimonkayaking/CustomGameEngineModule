@@ -20,30 +20,23 @@ namespace CustomVisualScripting.Editor.Nodes.Base
             if (string.IsNullOrEmpty(NodeId))
             {
                 NodeId = System.Guid.NewGuid().ToString();
+                SetGUID(NodeId);
             }
-            // Устанавливаем GUID
-            if (!string.IsNullOrEmpty(NodeId))
+        }
+
+        public void SetGUID(string guid)
+        {
+            var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (guidField != null)
             {
-                var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (guidField != null)
-                {
-                    guidField.SetValue(this, NodeId);
-                }
+                guidField.SetValue(this, guid);
             }
         }
 
         public virtual void InitializeFromData(NodeData data)
         {
             NodeId = data.Id;
-            // Устанавливаем GUID
-            if (!string.IsNullOrEmpty(NodeId))
-            {
-                var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (guidField != null)
-                {
-                    guidField.SetValue(this, NodeId);
-                }
-            }
+            SetGUID(NodeId);
         }
 
         public virtual NodeData ToNodeData()

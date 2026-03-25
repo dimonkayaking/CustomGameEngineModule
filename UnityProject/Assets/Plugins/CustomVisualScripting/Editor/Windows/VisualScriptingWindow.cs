@@ -358,6 +358,7 @@ namespace CustomVisualScripting.Editor.Windows
         if (node != null)
         {
             node.NodeId = data.Id;
+            node.SetGUID(data.Id);
             
             // Устанавливаем значения
             if (!string.IsNullOrEmpty(data.Value))
@@ -380,7 +381,6 @@ namespace CustomVisualScripting.Editor.Windows
     
     return node;
 }
-    
         
         private void OnDestroy()
         {
