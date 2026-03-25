@@ -14,9 +14,6 @@ namespace CustomVisualScripting.Editor.Nodes.Base
 
         public abstract NodeType NodeType { get; }
 
-        // Переопределяем GUID, чтобы использовать NodeId
-        public override string GUID => string.IsNullOrEmpty(NodeId) ? base.GUID : NodeId;
-
         protected override void Enable()
         {
             base.Enable();
@@ -24,11 +21,29 @@ namespace CustomVisualScripting.Editor.Nodes.Base
             {
                 NodeId = System.Guid.NewGuid().ToString();
             }
+            // Устанавливаем GUID
+            if (!string.IsNullOrEmpty(NodeId))
+            {
+                var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (guidField != null)
+                {
+                    guidField.SetValue(this, NodeId);
+                }
+            }
         }
 
         public virtual void InitializeFromData(NodeData data)
         {
             NodeId = data.Id;
+            // Устанавливаем GUID
+            if (!string.IsNullOrEmpty(NodeId))
+            {
+                var guidField = typeof(GraphProcessor.BaseNode).GetField("_GUID", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (guidField != null)
+                {
+                    guidField.SetValue(this, NodeId);
+                }
+            }
         }
 
         public virtual NodeData ToNodeData()
