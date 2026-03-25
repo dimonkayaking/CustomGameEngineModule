@@ -218,7 +218,6 @@ namespace CustomVisualScripting.Editor.Windows
                     var node = CreateNodeFromData(nodeData);
                     if (node != null)
                     {
-                        node.NodeId = nodeData.Id;
                         _internalGraph.AddNode(node);
                     }
                 }
@@ -292,85 +291,89 @@ namespace CustomVisualScripting.Editor.Windows
             
             CustomVisualScripting.Editor.Nodes.Base.CustomBaseNode node = null;
             
-            switch (data.Type)
+            try
             {
-                case NodeType.LiteralInt:
-                    node = new CustomVisualScripting.Editor.Nodes.Literals.IntNode();
-                    break;
-                case NodeType.LiteralFloat:
-                    node = new CustomVisualScripting.Editor.Nodes.Literals.FloatNode();
-                    break;
-                case NodeType.LiteralBool:
-                    node = new CustomVisualScripting.Editor.Nodes.Literals.BoolNode();
-                    break;
-                case NodeType.LiteralString:
-                    node = new CustomVisualScripting.Editor.Nodes.Literals.StringNode();
-                    break;
-                case NodeType.MathAdd:
-                    node = new CustomVisualScripting.Editor.Nodes.Math.AddNode();
-                    break;
-                case NodeType.MathSubtract:
-                    node = new CustomVisualScripting.Editor.Nodes.Math.SubtractNode();
-                    break;
-                case NodeType.MathMultiply:
-                    node = new CustomVisualScripting.Editor.Nodes.Math.MultiplyNode();
-                    break;
-                case NodeType.MathDivide:
-                    node = new CustomVisualScripting.Editor.Nodes.Math.DivideNode();
-                    break;
-                case NodeType.CompareEqual:
-                    node = new CustomVisualScripting.Editor.Nodes.Comparison.EqualNode();
-                    break;
-                case NodeType.CompareGreater:
-                    node = new CustomVisualScripting.Editor.Nodes.Comparison.GreaterNode();
-                    break;
-                case NodeType.CompareLess:
-                    node = new CustomVisualScripting.Editor.Nodes.Comparison.LessNode();
-                    break;
-                case NodeType.FlowIf:
-                    node = new CustomVisualScripting.Editor.Nodes.Flow.IfNode();
-                    break;
-                case NodeType.DebugLog:
-                    node = new CustomVisualScripting.Editor.Nodes.Debug.DebugLogNode();
-                    break;
-                case NodeType.UnityGetPosition:
-                    node = new CustomVisualScripting.Editor.Nodes.Unity.GetPositionNode();
-                    break;
-                case NodeType.UnitySetPosition:
-                    node = new CustomVisualScripting.Editor.Nodes.Unity.SetPositionNode();
-                    break;
-                case NodeType.UnityVector3:
-                    node = new CustomVisualScripting.Editor.Nodes.Unity.Vector3CreateNode();
-                    break;
-                case NodeType.VariableGet:
-                    node = new CustomVisualScripting.Editor.Nodes.Variables.GetVariableNode();
-                    break;
-                case NodeType.VariableSet:
-                    node = new CustomVisualScripting.Editor.Nodes.Variables.SetVariableNode();
-                    break;
-                case NodeType.VariableDeclaration:
-                    node = new CustomVisualScripting.Editor.Nodes.Variables.VariableDeclarationNode();
-                    break;
-                default:
-                    return null;
-            }
-            
-            if (node != null)
-            {
-                node.NodeId = data.Id;
-                
-                // Инициализируем значениями из data для литералов
-                if (!string.IsNullOrEmpty(data.Value))
+                switch (data.Type)
                 {
-                    if (node is CustomVisualScripting.Editor.Nodes.Literals.IntNode intNode && int.TryParse(data.Value, out int intVal))
-                        intNode.intValue = intVal;
-                    else if (node is CustomVisualScripting.Editor.Nodes.Literals.FloatNode floatNode && float.TryParse(data.Value, out float floatVal))
-                        floatNode.floatValue = floatVal;
-                    else if (node is CustomVisualScripting.Editor.Nodes.Literals.BoolNode boolNode && bool.TryParse(data.Value, out bool boolVal))
-                        boolNode.boolValue = boolVal;
-                    else if (node is CustomVisualScripting.Editor.Nodes.Literals.StringNode stringNode)
-                        stringNode.stringValue = data.Value;
+                    case NodeType.LiteralInt:
+                        node = new CustomVisualScripting.Editor.Nodes.Literals.IntNode();
+                        break;
+                    case NodeType.LiteralFloat:
+                        node = new CustomVisualScripting.Editor.Nodes.Literals.FloatNode();
+                        break;
+                    case NodeType.LiteralBool:
+                        node = new CustomVisualScripting.Editor.Nodes.Literals.BoolNode();
+                        break;
+                    case NodeType.LiteralString:
+                        node = new CustomVisualScripting.Editor.Nodes.Literals.StringNode();
+                        break;
+                    case NodeType.MathAdd:
+                        node = new CustomVisualScripting.Editor.Nodes.Math.AddNode();
+                        break;
+                    case NodeType.MathSubtract:
+                        node = new CustomVisualScripting.Editor.Nodes.Math.SubtractNode();
+                        break;
+                    case NodeType.MathMultiply:
+                        node = new CustomVisualScripting.Editor.Nodes.Math.MultiplyNode();
+                        break;
+                    case NodeType.MathDivide:
+                        node = new CustomVisualScripting.Editor.Nodes.Math.DivideNode();
+                        break;
+                    case NodeType.CompareEqual:
+                        node = new CustomVisualScripting.Editor.Nodes.Comparison.EqualNode();
+                        break;
+                    case NodeType.CompareGreater:
+                        node = new CustomVisualScripting.Editor.Nodes.Comparison.GreaterNode();
+                        break;
+                    case NodeType.CompareLess:
+                        node = new CustomVisualScripting.Editor.Nodes.Comparison.LessNode();
+                        break;
+                    case NodeType.FlowIf:
+                        node = new CustomVisualScripting.Editor.Nodes.Flow.IfNode();
+                        break;
+                    case NodeType.DebugLog:
+                        node = new CustomVisualScripting.Editor.Nodes.Debug.DebugLogNode();
+                        break;
+                    case NodeType.UnityGetPosition:
+                        node = new CustomVisualScripting.Editor.Nodes.Unity.GetPositionNode();
+                        break;
+                    case NodeType.UnitySetPosition:
+                        node = new CustomVisualScripting.Editor.Nodes.Unity.SetPositionNode();
+                        break;
+                    case NodeType.UnityVector3:
+                        node = new CustomVisualScripting.Editor.Nodes.Unity.Vector3CreateNode();
+                        break;
+                    case NodeType.VariableGet:
+                        node = new CustomVisualScripting.Editor.Nodes.Variables.GetVariableNode();
+                        break;
+                    case NodeType.VariableSet:
+                        node = new CustomVisualScripting.Editor.Nodes.Variables.SetVariableNode();
+                        break;
+                    case NodeType.VariableDeclaration:
+                        node = new CustomVisualScripting.Editor.Nodes.Variables.VariableDeclarationNode();
+                        break;
                 }
+                
+                if (node != null)
+                {
+                    node.NodeId = data.Id;
+                    
+                    if (!string.IsNullOrEmpty(data.Value))
+                    {
+                        if (node is CustomVisualScripting.Editor.Nodes.Literals.IntNode intNode && int.TryParse(data.Value, out int intVal))
+                            intNode.intValue = intVal;
+                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.FloatNode floatNode && float.TryParse(data.Value, out float floatVal))
+                            floatNode.floatValue = floatVal;
+                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.BoolNode boolNode && bool.TryParse(data.Value, out bool boolVal))
+                            boolNode.boolValue = boolVal;
+                        else if (node is CustomVisualScripting.Editor.Nodes.Literals.StringNode stringNode)
+                            stringNode.stringValue = data.Value;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VS] Ошибка создания узла {data.Type}: {e.Message}");
             }
             
             return node;
