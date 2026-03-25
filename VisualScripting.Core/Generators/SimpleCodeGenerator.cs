@@ -24,58 +24,54 @@ namespace VisualScripting.Core.Generators
             
             foreach (var node in graph.Nodes)
             {
-                switch (node.Type)
+                switch ((int)node.Type)
                 {
-                    case NodeType.LiteralInt:
+                    case 1: // LiteralInt
                         var varName = $"temp{tempCounter++}";
                         variables[node.Id] = varName;
                         sb.AppendLine($"        int {varName} = {node.Value};");
                         break;
                         
-                    case NodeType.LiteralFloat:
+                    case 2: // LiteralFloat
                         varName = $"temp{tempCounter++}";
                         variables[node.Id] = varName;
                         sb.AppendLine($"        float {varName} = {node.Value}f;");
                         break;
                         
-                    case NodeType.LiteralBool:
+                    case 3: // LiteralBool
                         varName = $"temp{tempCounter++}";
                         variables[node.Id] = varName;
                         sb.AppendLine($"        bool {varName} = {node.Value.ToLower()};");
                         break;
                         
-                    case NodeType.LiteralString:
+                    case 4: // LiteralString
                         varName = $"temp{tempCounter++}";
                         variables[node.Id] = varName;
                         sb.AppendLine($"        string {varName} = \"{node.Value}\";");
                         break;
                         
-                    case NodeType.MathAdd:
+                    case 10: // MathAdd
                         var resultVar = $"result_{tempCounter++}";
                         variables[node.Id] = resultVar;
-                        sb.AppendLine($"        var {resultVar} = temp0 + temp1; // TODO: Connect inputs");
+                        sb.AppendLine($"        var {resultVar} = temp0 + temp1;");
                         break;
                         
-                    case NodeType.MathSubtract:
+                    case 11: // MathSubtract
                         resultVar = $"result_{tempCounter++}";
                         variables[node.Id] = resultVar;
-                        sb.AppendLine($"        var {resultVar} = temp0 - temp1; // TODO: Connect inputs");
+                        sb.AppendLine($"        var {resultVar} = temp0 - temp1;");
                         break;
                         
-                    case NodeType.MathMultiply:
+                    case 12: // MathMultiply
                         resultVar = $"result_{tempCounter++}";
                         variables[node.Id] = resultVar;
-                        sb.AppendLine($"        var {resultVar} = temp0 * temp1; // TODO: Connect inputs");
+                        sb.AppendLine($"        var {resultVar} = temp0 * temp1;");
                         break;
                         
-                    case NodeType.MathDivide:
+                    case 13: // MathDivide
                         resultVar = $"result_{tempCounter++}";
                         variables[node.Id] = resultVar;
-                        sb.AppendLine($"        var {resultVar} = temp0 / temp1; // TODO: Connect inputs");
-                        break;
-                        
-                    default:
-                        sb.AppendLine($"        // Неподдерживаемый тип узла: {node.Type}");
+                        sb.AppendLine($"        var {resultVar} = temp0 / temp1;");
                         break;
                 }
             }
