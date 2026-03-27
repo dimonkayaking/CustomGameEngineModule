@@ -1,3 +1,5 @@
+# Это ветка используется для организационных моментов: ТЗ, планы..
+
 ## Доска
 https://boardmix.com/app/editor/h_0dEe8kOR01dMc_kUaEPw
 
