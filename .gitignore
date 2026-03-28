@@ -480,8 +480,7 @@ $RECYCLE.BIN/
 *.swp
 
 # ===== ИСКЛЮЧЕНИЯ ДЛЯ ПЛАГИНА VISUAL SCRIPTING =====
-# Не игнорируем наши папки внутри плагина!
-!UnityProject/Assets/Plugins/CustomVisualScripting/Editor/Nodes/Debug/
-!UnityProject/Assets/Plugins/CustomVisualScripting/Editor/Integration/
-!UnityProject/Assets/Plugins/CustomVisualScripting/Editor/Windows/
-!UnityProject/Assets/Plugins/CustomVisualScripting/Runtime/
+# Не игнорируем файлы плагина (сохраняем в репозитории)
+!UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/
+# Игнорируем только бинарные файлы
+UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/Core/*.dll
