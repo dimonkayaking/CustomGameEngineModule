@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -108,8 +109,8 @@ namespace VisualScripting.Core.Parsers
 
         private sealed class FlowHost
         {
-            public required string NodeId { get; init; }
-            public string ExecOutPort { get; init; } = "execOut";
+            public string NodeId { get; set; } = "";
+            public string ExecOutPort { get; set; } = "execOut";
         }
 
         private FlowHost? VisitStatementForFlow(StatementSyntax stmt, string? prevNode, string prevPort)
