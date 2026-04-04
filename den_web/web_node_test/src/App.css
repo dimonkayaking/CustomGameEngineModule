@@ -1,0 +1,116 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+body.light {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+body.dark {
+  background: #04060c;
+  color: #f8fafc;
+  filter: none;
+}
+
+body.dark .main-layout {
+  background: #05070f;
+}
+
+body.dark .site-header,
+body.dark .site-footer,
+body.dark .dashboard,
+body.dark .lesson-page,
+body.dark .auth-container,
+body.dark .course-page,
+body.dark .topic-page,
+body.dark .profile-page,
+body.dark .plugin-page {
+  background: #0b1324 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark h1,
+body.dark h2,
+body.dark h3,
+body.dark h4,
+body.dark h5,
+body.dark h6,
+body.dark p,
+body.dark a,
+body.dark li,
+body.dark span,
+body.dark button,
+body.dark label {
+  color: #f8fafc;
+}
+
+body.dark img,
+body.dark video,
+body.dark pre,
+body.dark code {
+  filter: none;
+}
+
+body.dark .btn-primary,
+body.dark .topic-btn,
+body.dark .run-button,
+body.dark .check-button,
+body.dark .generate-key-btn {
+  color: #fff;
+}
+
+.App {
+  min-height: 100vh;
+  background: inherit;
+  color: inherit;
+}
+
+body.dark .main-layout {
+  background: #0b1226;
+}
+
+
+.App .main-layout {
+  padding-top: 60px;
+  min-height: calc(100vh - 120px);
+}
+
+body.dark .main-layout {
+  background: #111827;
+}
+
+body.light .main-layout {
+  background: #f8fafc;
+}
+
+body.dark .site-footer {
+  background: #0f172a;
+  border-top-color: #334155;
+  color: #cbd5e1;
+}
+
+body.dark .site-footer a {
+  color: #cbd5e1;
+}
+
+
+.App {
+  min-height: 100vh;
+}
+
+.main-layout {
+  padding-top: 60px;
+  min-height: calc(100vh - 120px);
+}

@@ -1,0 +1,164 @@
+.profile-page {
+  max-width: 1000px;
+  margin: 90px auto 40px;
+  padding: 0 1rem;
+}
+
+.profile-page h1 {
+  color: #1f2937;
+  margin-bottom: 1.2rem;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.profile-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.profile-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.profile-card h2 {
+  margin-top: 0;
+  color: #1f2937;
+}
+
+.profile-card p {
+  color: #475569;
+  line-height: 1.65;
+}
+
+.change-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.change-password-form input {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.change-password-form input::placeholder {
+  color: #94a3b8;
+}
+
+.change-password-form input:focus {
+  outline: none;
+  border-color: #5661f7;
+  box-shadow: 0 0 0 3px rgba(86, 97, 247, 0.15);
+}
+
+.change-password-form button {
+  border: none;
+  border-radius: 8px;
+  background: #5661f7;
+  color: white;
+  padding: 0.55rem;
+  cursor: pointer;
+}
+
+.status-msg {
+  font-size: 0.9rem;
+  min-height: 1.2rem;
+  color: #64748b;
+}
+
+.status-msg--success {
+  color: #16a34a;
+}
+
+.status-msg--error {
+  color: #dc2626;
+}
+
+.progress-line {
+  height: 14px;
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-top: 0.6rem;
+}
+
+.progress-line div {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+@media (max-width: 768px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-notice {
+  margin: 110px auto;
+  text-align: center;
+  font-style: italic;
+}
+
+body.dark .profile-page h1,
+body.dark .profile-card h2,
+body.dark .profile-card strong {
+  color: #f8fafc;
+}
+
+body.dark .profile-card {
+  background: #111827;
+  border-color: #334155;
+  box-shadow: 0 20px 45px rgba(2, 8, 23, 0.35);
+}
+
+body.dark .profile-card p,
+body.dark .profile-notice {
+  color: #cbd5e1;
+}
+
+body.dark .change-password-form input {
+  background: #0b1220;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+body.dark .change-password-form input::placeholder {
+  color: #94a3b8;
+}
+
+body.dark .change-password-form input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+body.dark .change-password-form button {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+body.dark .progress-line {
+  background: #1e293b;
+}
+
+body.dark .status-msg {
+  color: #94a3b8;
+}
+
+body.dark .status-msg--success {
+  color: #4ade80;
+}
+
+body.dark .status-msg--error {
+  color: #f87171;
+}
