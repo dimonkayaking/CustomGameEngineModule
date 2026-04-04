@@ -31,6 +31,7 @@ namespace CustomVisualScripting.Editor.Windows
         private ErrorPanel _errorPanel;
         
         private string _currentFilePath;
+        private bool _hasUnsavedChanges = false;
         
         [MenuItem("Tools/Visual Scripting")]
         public static void OpenWindow()
@@ -52,6 +53,14 @@ namespace CustomVisualScripting.Editor.Windows
             CleanupGraph();
         }
         
+        private void OnGUI()
+        {
+            if (EditorWindow.focusedWindow == this && !_hasUnsavedChanges)
+            {
+                _hasUnsavedChanges = true;
+            }
+        }
+        
         private void CleanupGraph()
         {
             if (_graphView != null)
@@ -70,11 +79,11 @@ namespace CustomVisualScripting.Editor.Windows
         private void CreateGUI()
         {
             _currentGraph = new CompleteGraphData();
+            _hasUnsavedChanges = false;
             
             var root = rootVisualElement;
             
             _toolbar = new CustomToolbar();
-            _toolbar.NewButton.clicked += OnNew;
             _toolbar.ParseButton.clicked += OnParse;
             _toolbar.GenerateButton.clicked += OnGenerate;
             _toolbar.SaveButton.clicked += OnSave;
@@ -93,13 +102,6 @@ namespace CustomVisualScripting.Editor.Windows
             _graphContainer.style.backgroundColor = new StyleColor(new Color(0.22f, 0.22f, 0.22f));
             _graphContainer.style.flexGrow = 1;
             
-            var placeholder = new Label("Здесь будет граф\n\nНажмите 'Парсить код' для отображения");
-            placeholder.style.marginTop = 20;
-            placeholder.style.marginLeft = 10;
-            placeholder.style.color = Color.gray;
-            placeholder.style.whiteSpace = WhiteSpace.Normal;
-            _graphContainer.Add(placeholder);
-            
             splitView.Add(_graphContainer);
             root.Add(splitView);
             
@@ -107,6 +109,8 @@ namespace CustomVisualScripting.Editor.Windows
             root.Add(_errorPanel);
             
             _toolbar.SetStatusNormal("Готов к работе");
+            
+            UpdateGraphView();
         }
         
         private void OnParse()
@@ -124,6 +128,7 @@ namespace CustomVisualScripting.Editor.Windows
             
             _errorPanel.Clear();
             _currentGraph = GraphConverter.LogicToComplete(result.Graph, _currentGraph);
+            _hasUnsavedChanges = false;
             UpdateGraphView();
             _toolbar.SetStatusSuccess($"Создано нод: {result.Graph.Nodes.Count}");
         }
@@ -145,27 +150,6 @@ namespace CustomVisualScripting.Editor.Windows
             
             _toolbar.SetStatusSuccess("Код сгенерирован");
         }
-        
-        private void OnNew()
-        {
-            string path = EditorUtility.SaveFilePanel("Новый граф — выберите имя файла", Application.dataPath, "new_graph.json", "json");
-            if (string.IsNullOrEmpty(path)) return;
-
-            _codeEditor.Clear();
-            _currentGraph = new CompleteGraphData();
-            _errorPanel.Clear();
-            _currentFilePath = path;
-
-            if (GraphSaver.SaveToJson(_currentGraph, path))
-            {
-                UpdateGraphView();
-                _toolbar.SetStatusSuccess($"Создан: {Path.GetFileName(path)}");
-            }
-            else
-            {
-                _toolbar.SetStatusError("Ошибка создания файла");
-            }
-        }
 
         private void OnSave()
         {
@@ -181,6 +165,7 @@ namespace CustomVisualScripting.Editor.Windows
             if (GraphSaver.SaveToJson(_currentGraph, _currentFilePath))
             {
                 _toolbar.SetStatusSuccess($"Сохранено: {Path.GetFileName(_currentFilePath)}");
+                _hasUnsavedChanges = false;
             }
             else
             {
@@ -204,6 +189,7 @@ namespace CustomVisualScripting.Editor.Windows
             if (GraphSaver.SaveToJson(_currentGraph, path))
             {
                 _toolbar.SetStatusSuccess($"Сохранено: {Path.GetFileName(path)}");
+                _hasUnsavedChanges = false;
             }
             else
             {
@@ -221,6 +207,7 @@ namespace CustomVisualScripting.Editor.Windows
             {
                 _currentGraph = loaded;
                 _currentFilePath = path;
+                _hasUnsavedChanges = false;
                 _codeEditor.Code = GeneratorBridge.Generate(_currentGraph.LogicGraph);
                 UpdateGraphView();
                 _toolbar.SetStatusSuccess($"Загружено: {Path.GetFileName(path)}");
@@ -236,6 +223,8 @@ namespace CustomVisualScripting.Editor.Windows
             _codeEditor.Clear();
             _currentGraph = new CompleteGraphData();
             _errorPanel.Clear();
+            _currentFilePath = null;
+            _hasUnsavedChanges = false;
             UpdateGraphView();
             _toolbar.SetStatusNormal("Очищено");
         }
@@ -309,59 +298,43 @@ namespace CustomVisualScripting.Editor.Windows
         {
             _graphContainer.Clear();
             
-            if (_currentGraph?.LogicGraph?.Nodes == null || _currentGraph.LogicGraph.Nodes.Count == 0)
-            {
-                var placeholder = new Label("Нет нод для отображения\n\nНажмите 'Парсить код' для создания графа");
-                placeholder.style.marginTop = 20;
-                placeholder.style.marginLeft = 10;
-                placeholder.style.color = Color.gray;
-                placeholder.style.whiteSpace = WhiteSpace.Normal;
-                _graphContainer.Add(placeholder);
-                return;
-            }
-            
             try
             {
                 CleanupGraph();
                 
                 _internalGraph = ScriptableObject.CreateInstance<BaseGraph>();
                 
-                foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
+                // Создаём ноды, если они есть
+                if (_currentGraph?.LogicGraph?.Nodes != null && _currentGraph.LogicGraph.Nodes.Count > 0)
                 {
-                    var node = CreateNodeFromData(nodeData);
-                    if (node != null)
+                    foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
                     {
-                        node.NodeId = nodeData.Id;
-                        node.InitializeFromData(nodeData);
-                        
-                        if (node is IntNode intNode && int.TryParse(nodeData.Value, out int intVal))
-                            intNode.intValue = intVal;
-                        else if (node is FloatNode floatNode && float.TryParse(nodeData.Value, out float floatVal))
-                            floatNode.floatValue = floatVal;
-                        else if (node is BoolNode boolNode && bool.TryParse(nodeData.Value, out bool boolVal))
-                            boolNode.boolValue = boolVal;
-                        else if (node is StringNode stringNode)
-                            stringNode.stringValue = nodeData.Value;
-                        
-                        _internalGraph.AddNode(node);
+                        var node = CreateNodeFromData(nodeData);
+                        if (node != null)
+                        {
+                            node.NodeId = nodeData.Id;
+                            node.InitializeFromData(nodeData);
+                            
+                            if (node is IntNode intNode && int.TryParse(nodeData.Value, out int intVal))
+                                intNode.intValue = intVal;
+                            else if (node is FloatNode floatNode && float.TryParse(nodeData.Value, out float floatVal))
+                                floatNode.floatValue = floatVal;
+                            else if (node is BoolNode boolNode && bool.TryParse(nodeData.Value, out bool boolVal))
+                                boolNode.boolValue = boolVal;
+                            else if (node is StringNode stringNode)
+                                stringNode.stringValue = nodeData.Value;
+                            
+                            _internalGraph.AddNode(node);
+                        }
                     }
                 }
                 
-                if (_internalGraph.nodes.Count == 0)
-                {
-                    var placeholder = new Label("Не удалось создать узлы для отображения");
-                    placeholder.style.marginTop = 20;
-                    placeholder.style.marginLeft = 10;
-                    placeholder.style.color = Color.yellow;
-                    _graphContainer.Add(placeholder);
-                    return;
-                }
-                
+                // ВСЕГДА создаём визуальный граф (даже если нод нет)
                 _graphView = new BaseGraphView(this);
                 _graphView.Initialize(_internalGraph);
                 _graphView.style.flexGrow = 1;
                 
-                // Обновляем названия нод после создания
+                // Обновляем названия нод
                 foreach (var nodeView in _graphView.nodeViews)
                 {
                     if (nodeView.nodeTarget is CustomBaseNode customNode)
@@ -370,7 +343,8 @@ namespace CustomVisualScripting.Editor.Windows
                     }
                 }
                 
-                if (_currentGraph.VisualNodes != null && _currentGraph.VisualNodes.Count > 0)
+                // Восстанавливаем позиции (если есть)
+                if (_currentGraph?.VisualNodes != null && _currentGraph.VisualNodes.Count > 0)
                 {
                     foreach (var nodeView in _graphView.nodeViews)
                     {
@@ -384,24 +358,27 @@ namespace CustomVisualScripting.Editor.Windows
                         }
                     }
                 }
-                else
-                {
-                    int index = 0;
-                    foreach (var nodeView in _graphView.nodeViews)
-                    {
-                        float x = 100 + (index % 5) * 200;
-                        float y = 100 + (index / 5) * 150;
-                        nodeView.SetPosition(new Rect(x, y, 100, 50));
-                        index++;
-                    }
-                }
                 
+                // Центрируем граф
                 _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
                 _graphView.FrameAll();
                 
                 _graphContainer.Add(_graphView);
                 
-                _toolbar.SetStatusSuccess($"Отображено {_internalGraph.nodes.Count} нод");
+                // Добавляем подсказку на пустой холст
+                if (_internalGraph.nodes.Count == 0)
+                {
+                    var overlay = new Label("Нет нод\n\nНажмите 'Парсить код' для создания графа\nили перетащите ноду из меню (если доступно)");
+                    overlay.style.position = Position.Absolute;
+                    overlay.style.top = 20;
+                    overlay.style.left = 20;
+                    overlay.style.color = Color.gray;
+                    overlay.style.fontSize = 14;
+                    overlay.style.whiteSpace = WhiteSpace.Normal;
+                    _graphContainer.Add(overlay);
+                }
+                
+                _toolbar.SetStatusSuccess($"Граф готов{(_internalGraph.nodes.Count > 0 ? $" — {_internalGraph.nodes.Count} нод" : "")}");
             }
             catch (Exception e)
             {
@@ -467,6 +444,21 @@ namespace CustomVisualScripting.Editor.Windows
         
         private void OnDestroy()
         {
+            if (_hasUnsavedChanges)
+            {
+                bool save = EditorUtility.DisplayDialog(
+                    "Несохранённые изменения",
+                    "Хотите сохранить граф перед закрытием?",
+                    "Сохранить",
+                    "Не сохранять"
+                );
+                
+                if (save)
+                {
+                    OnSave();
+                }
+            }
+            
             CleanupGraph();
         }
     }
