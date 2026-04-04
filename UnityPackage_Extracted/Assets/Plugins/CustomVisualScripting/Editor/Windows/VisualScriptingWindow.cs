@@ -29,6 +29,7 @@ namespace CustomVisualScripting.Editor.Windows
         private CodeEditorView _codeEditor;
         private CustomToolbar _toolbar;
         private ErrorPanel _errorPanel;
+        private ConsoleView _consoleView;
         
         private string _currentFilePath;
         private bool _hasUnsavedChanges = false;
@@ -46,10 +47,12 @@ namespace CustomVisualScripting.Editor.Windows
         {
             ParserBridge.Initialize();
             GeneratorBridge.Initialize();
+            Application.logMessageReceived += OnLogMessageReceived;
         }
         
         private void OnDisable()
         {
+            Application.logMessageReceived -= OnLogMessageReceived;
             CleanupGraph();
         }
         
@@ -58,6 +61,14 @@ namespace CustomVisualScripting.Editor.Windows
             if (EditorWindow.focusedWindow == this && !_hasUnsavedChanges)
             {
                 _hasUnsavedChanges = true;
+            }
+        }
+        
+        private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
+        {
+            if (_consoleView != null)
+            {
+                _consoleView.AddMessage(condition, type);
             }
         }
         
@@ -108,6 +119,10 @@ namespace CustomVisualScripting.Editor.Windows
             _errorPanel = new ErrorPanel();
             root.Add(_errorPanel);
             
+            _consoleView = new ConsoleView();
+            _consoleView.style.marginTop = 5;
+            root.Add(_consoleView);
+            
             _toolbar.SetStatusNormal("Готов к работе");
             
             UpdateGraphView();
@@ -137,7 +152,6 @@ namespace CustomVisualScripting.Editor.Windows
         {
             _toolbar.SetStatusWarning("Генерация...");
             
-            // Полная синхронизация графа перед генерацией
             SyncFullGraphFromView();
             
             string code = GeneratorBridge.Generate(_currentGraph.LogicGraph);
@@ -154,7 +168,6 @@ namespace CustomVisualScripting.Editor.Windows
                 return;
             }
 
-            // Полная синхронизация графа перед сохранением
             SyncFullGraphFromView();
             SaveVisualNodePositions();
 
@@ -241,18 +254,13 @@ namespace CustomVisualScripting.Editor.Windows
             }
         }
         
-        /// <summary>
-        /// Полная синхронизация графа из визуального представления в данные
-        /// </summary>
         private void SyncFullGraphFromView()
         {
             if (_graphView == null) return;
             
-            // Очищаем текущие данные
             _currentGraph.LogicGraph.Nodes.Clear();
             _currentGraph.LogicGraph.Edges.Clear();
             
-            // Синхронизируем ноды
             foreach (var nodeView in _graphView.nodeViews)
             {
                 if (nodeView.nodeTarget is CustomBaseNode customNode)
@@ -261,7 +269,6 @@ namespace CustomVisualScripting.Editor.Windows
                     nodeData.Id = customNode.NodeId;
                     nodeData.VariableName = customNode.variableName;
                     
-                    // Сохраняем значения в зависимости от типа ноды
                     if (customNode is IntNode intNode)
                         nodeData.Value = intNode.intValue.ToString();
                     else if (customNode is FloatNode floatNode)
@@ -274,10 +281,6 @@ namespace CustomVisualScripting.Editor.Windows
                     _currentGraph.LogicGraph.Nodes.Add(nodeData);
                 }
             }
-            
-            // Синхронизируем связи (если есть API для получения портов)
-            // TODO: Добавить синхронизацию связей из _graphView
-            // Это потребует доступа к графу и его связям
             
             Debug.Log($"[VS] Синхронизировано нод: {_currentGraph.LogicGraph.Nodes.Count}");
         }
