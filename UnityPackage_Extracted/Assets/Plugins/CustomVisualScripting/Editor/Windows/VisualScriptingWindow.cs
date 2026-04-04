@@ -135,15 +135,10 @@ namespace CustomVisualScripting.Editor.Windows
         
         private void OnGenerate()
         {
-            if (_currentGraph?.LogicGraph?.Nodes == null || _currentGraph.LogicGraph.Nodes.Count == 0)
-            {
-                _toolbar.SetStatusError("Сначала распарси код");
-                return;
-            }
-            
             _toolbar.SetStatusWarning("Генерация...");
             
-            SyncNodeValuesFromView();
+            // Полная синхронизация графа перед генерацией
+            SyncFullGraphFromView();
             
             string code = GeneratorBridge.Generate(_currentGraph.LogicGraph);
             _codeEditor.Code = code;
@@ -159,7 +154,8 @@ namespace CustomVisualScripting.Editor.Windows
                 return;
             }
 
-            SyncNodeValuesFromView();
+            // Полная синхронизация графа перед сохранением
+            SyncFullGraphFromView();
             SaveVisualNodePositions();
 
             if (GraphSaver.SaveToJson(_currentGraph, _currentFilePath))
@@ -182,7 +178,7 @@ namespace CustomVisualScripting.Editor.Windows
             string path = EditorUtility.SaveFilePanel("Сохранить граф как", Application.dataPath, defaultName, "json");
             if (string.IsNullOrEmpty(path)) return;
 
-            SyncNodeValuesFromView();
+            SyncFullGraphFromView();
             SaveVisualNodePositions();
             _currentFilePath = path;
 
@@ -245,53 +241,45 @@ namespace CustomVisualScripting.Editor.Windows
             }
         }
         
-        private void SyncNodeValuesFromView()
+        /// <summary>
+        /// Полная синхронизация графа из визуального представления в данные
+        /// </summary>
+        private void SyncFullGraphFromView()
         {
-            if (_graphView == null || _currentGraph?.LogicGraph?.Nodes == null)
-                return;
+            if (_graphView == null) return;
             
+            // Очищаем текущие данные
+            _currentGraph.LogicGraph.Nodes.Clear();
+            _currentGraph.LogicGraph.Edges.Clear();
+            
+            // Синхронизируем ноды
             foreach (var nodeView in _graphView.nodeViews)
             {
                 if (nodeView.nodeTarget is CustomBaseNode customNode)
                 {
-                    var nodeData = _currentGraph.LogicGraph.Nodes.FirstOrDefault(n => n.Id == customNode.NodeId);
-                    if (nodeData != null)
-                    {
-                        bool valueChanged = false;
-                        
-                        if (customNode is IntNode intNode)
-                        {
-                            var oldValue = nodeData.Value;
-                            nodeData.Value = intNode.intValue.ToString();
-                            valueChanged = oldValue != nodeData.Value;
-                        }
-                        else if (customNode is FloatNode floatNode)
-                        {
-                            var oldValue = nodeData.Value;
-                            nodeData.Value = floatNode.floatValue.ToString();
-                            valueChanged = oldValue != nodeData.Value;
-                        }
-                        else if (customNode is BoolNode boolNode)
-                        {
-                            var oldValue = nodeData.Value;
-                            nodeData.Value = boolNode.boolValue.ToString();
-                            valueChanged = oldValue != nodeData.Value;
-                        }
-                        else if (customNode is StringNode stringNode)
-                        {
-                            var oldValue = nodeData.Value;
-                            nodeData.Value = stringNode.stringValue;
-                            valueChanged = oldValue != nodeData.Value;
-                        }
-                        
-                        if (valueChanged)
-                        {
-                            nodeView.title = customNode.name;
-                            nodeView.MarkDirtyRepaint();
-                        }
-                    }
+                    var nodeData = customNode.ToNodeData();
+                    nodeData.Id = customNode.NodeId;
+                    nodeData.VariableName = customNode.variableName;
+                    
+                    // Сохраняем значения в зависимости от типа ноды
+                    if (customNode is IntNode intNode)
+                        nodeData.Value = intNode.intValue.ToString();
+                    else if (customNode is FloatNode floatNode)
+                        nodeData.Value = floatNode.floatValue.ToString();
+                    else if (customNode is BoolNode boolNode)
+                        nodeData.Value = boolNode.boolValue.ToString();
+                    else if (customNode is StringNode stringNode)
+                        nodeData.Value = stringNode.stringValue;
+                    
+                    _currentGraph.LogicGraph.Nodes.Add(nodeData);
                 }
             }
+            
+            // Синхронизируем связи (если есть API для получения портов)
+            // TODO: Добавить синхронизацию связей из _graphView
+            // Это потребует доступа к графу и его связям
+            
+            Debug.Log($"[VS] Синхронизировано нод: {_currentGraph.LogicGraph.Nodes.Count}");
         }
         
         private void UpdateGraphView()
@@ -304,7 +292,6 @@ namespace CustomVisualScripting.Editor.Windows
                 
                 _internalGraph = ScriptableObject.CreateInstance<BaseGraph>();
                 
-                // Создаём ноды, если они есть
                 if (_currentGraph?.LogicGraph?.Nodes != null && _currentGraph.LogicGraph.Nodes.Count > 0)
                 {
                     foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
@@ -329,12 +316,10 @@ namespace CustomVisualScripting.Editor.Windows
                     }
                 }
                 
-                // ВСЕГДА создаём визуальный граф (даже если нод нет)
                 _graphView = new BaseGraphView(this);
                 _graphView.Initialize(_internalGraph);
                 _graphView.style.flexGrow = 1;
                 
-                // Обновляем названия нод
                 foreach (var nodeView in _graphView.nodeViews)
                 {
                     if (nodeView.nodeTarget is CustomBaseNode customNode)
@@ -343,7 +328,6 @@ namespace CustomVisualScripting.Editor.Windows
                     }
                 }
                 
-                // Восстанавливаем позиции (если есть)
                 if (_currentGraph?.VisualNodes != null && _currentGraph.VisualNodes.Count > 0)
                 {
                     foreach (var nodeView in _graphView.nodeViews)
@@ -359,13 +343,51 @@ namespace CustomVisualScripting.Editor.Windows
                     }
                 }
                 
-                // Центрируем граф
+                if (_currentGraph?.LogicGraph?.Edges != null && _currentGraph.LogicGraph.Edges.Count > 0)
+                {
+                    Debug.Log($"[VS] Начинаем создание {_currentGraph.LogicGraph.Edges.Count} связей...");
+                    
+                    foreach (var edge in _currentGraph.LogicGraph.Edges)
+                    {
+                        if (edge.FromPort == "execOut" || edge.FromPort == "execIn" || 
+                            edge.ToPort == "execOut" || edge.ToPort == "execIn")
+                        {
+                            Debug.Log($"[VS] Пропускаем порт потока: {edge.FromPort} → {edge.ToPort}");
+                            continue;
+                        }
+                        
+                        var fromNodeView = _graphView.nodeViews.FirstOrDefault(nv => 
+                            (nv.nodeTarget as CustomBaseNode)?.NodeId == edge.FromNodeId);
+                        var toNodeView = _graphView.nodeViews.FirstOrDefault(nv => 
+                            (nv.nodeTarget as CustomBaseNode)?.NodeId == edge.ToNodeId);
+                        
+                        if (fromNodeView != null && toNodeView != null)
+                        {
+                            var fromPort = fromNodeView.GetFirstPortViewFromFieldName(edge.FromPort);
+                            var toPort = toNodeView.GetFirstPortViewFromFieldName(edge.ToPort);
+                            
+                            if (fromPort != null && toPort != null)
+                            {
+                                _graphView.Connect(fromPort, toPort);
+                                Debug.Log($"[VS] Связь создана: {edge.FromNodeId}.{edge.FromPort} → {edge.ToNodeId}.{edge.ToPort}");
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"[VS] Не найден порт: FromPort='{edge.FromPort}', ToPort='{edge.ToPort}'");
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[VS] Не найдена нода: FromNodeId='{edge.FromNodeId}', ToNodeId='{edge.ToNodeId}'");
+                        }
+                    }
+                }
+                
                 _graphView.UpdateViewTransform(Vector3.zero, Vector3.one);
                 _graphView.FrameAll();
                 
                 _graphContainer.Add(_graphView);
                 
-                // Добавляем подсказку на пустой холст
                 if (_internalGraph.nodes.Count == 0)
                 {
                     var overlay = new Label("Нет нод\n\nНажмите 'Парсить код' для создания графа\nили перетащите ноду из меню (если доступно)");
