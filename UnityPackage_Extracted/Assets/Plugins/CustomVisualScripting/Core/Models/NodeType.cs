@@ -55,6 +55,17 @@ namespace VisualScripting.Core.Models
         LogicalAnd,
         LogicalOr,
         LogicalNot,
-        FlowElse
+        FlowElse,
+
+        // Sprint 2 — циклы и встроенные методы
+        FlowFor,
+        FlowWhile,
+        ConsoleWriteLine,
+        IntParse,
+        FloatParse,
+        ToStringConvert,
+        MathfAbs,
+        MathfMax,
+        MathfMin
     }
 }

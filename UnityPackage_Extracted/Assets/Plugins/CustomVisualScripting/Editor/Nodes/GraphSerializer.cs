@@ -52,10 +52,12 @@ namespace CustomVisualScripting.Editor.Nodes
                 NodeType.CompareEqual or NodeType.CompareGreater or NodeType.CompareLess
                     or NodeType.CompareNotEqual or NodeType.CompareGreaterOrEqual or NodeType.CompareLessOrEqual => "#FF9800",
                 NodeType.LogicalAnd or NodeType.LogicalOr or NodeType.LogicalNot => "#5C6BC0",
-                NodeType.FlowIf or NodeType.FlowElse => "#9C27B0",
-                NodeType.DebugLog => "#F44336",
+                NodeType.FlowIf or NodeType.FlowElse or NodeType.FlowFor or NodeType.FlowWhile => "#9C27B0",
+                NodeType.DebugLog or NodeType.ConsoleWriteLine => "#F44336",
                 NodeType.UnityGetPosition or NodeType.UnitySetPosition or NodeType.UnityVector3 => "#00BCD4",
                 NodeType.VariableGet or NodeType.VariableSet or NodeType.VariableDeclaration => "#3F51B5",
+                NodeType.IntParse or NodeType.FloatParse or NodeType.ToStringConvert
+                    or NodeType.MathfAbs or NodeType.MathfMax or NodeType.MathfMin => "#00ACC1",
                 _ => "#757575"
             };
         }
@@ -91,6 +93,15 @@ namespace CustomVisualScripting.Editor.Nodes
                 NodeType.VariableGet => "Get Variable",
                 NodeType.VariableSet => "Set Variable",
                 NodeType.VariableDeclaration => "Declare Variable",
+                NodeType.FlowFor => "For",
+                NodeType.FlowWhile => "While",
+                NodeType.ConsoleWriteLine => "Console.WriteLine",
+                NodeType.IntParse => "int.Parse",
+                NodeType.FloatParse => "float.Parse",
+                NodeType.ToStringConvert => "ToString",
+                NodeType.MathfAbs => "Mathf.Abs",
+                NodeType.MathfMax => "Mathf.Max",
+                NodeType.MathfMin => "Mathf.Min",
                 _ => "Unknown"
             };
         }

@@ -35,6 +35,17 @@ namespace CustomVisualScripting.Runtime.Execution
                     NodeType.LogicalAnd => LogicBin(node, graph, context, (a, b) => ToBool(a) && ToBool(b)),
                     NodeType.LogicalOr => LogicBin(node, graph, context, (a, b) => ToBool(a) || ToBool(b)),
                     NodeType.LogicalNot => !ToBool(GetPort(node, graph, context, "input")),
+                    NodeType.ConsoleWriteLine => ExecConsoleWriteLine(node, graph, context),
+                    NodeType.IntParse => ExecIntParse(node, graph, context),
+                    NodeType.FloatParse => ExecFloatParse(node, graph, context),
+                    NodeType.ToStringConvert => ExecToString(node, graph, context),
+                    NodeType.MathfAbs => UnityEngine.Mathf.Abs(ToSingle(GetPort(node, graph, context, "input"))),
+                    NodeType.MathfMax => UnityEngine.Mathf.Max(
+                        ToSingle(GetPort(node, graph, context, "inputA")),
+                        ToSingle(GetPort(node, graph, context, "inputB"))),
+                    NodeType.MathfMin => UnityEngine.Mathf.Min(
+                        ToSingle(GetPort(node, graph, context, "inputA")),
+                        ToSingle(GetPort(node, graph, context, "inputB"))),
                     _ => null
                 };
             }
@@ -129,6 +140,42 @@ namespace CustomVisualScripting.Runtime.Execution
             int i => i != 0,
             _ => false
         };
+
+        private static float ToSingle(object v) => v switch
+        {
+            float f => f,
+            int i => i,
+            double d => (float)d,
+            _ => 0f
+        };
+
+        private static object? ExecConsoleWriteLine(NodeData node, GraphData graph, Dictionary<string, object> ctx)
+        {
+            var msg = GetPort(node, graph, ctx, "message");
+            UnityEngine.Debug.Log(msg?.ToString() ?? "");
+            return null;
+        }
+
+        private static object? ExecIntParse(NodeData node, GraphData graph, Dictionary<string, object> ctx)
+        {
+            var s = GetPort(node, graph, ctx, "input")?.ToString();
+            return int.TryParse(s, out var n) ? n : 0;
+        }
+
+        private static object? ExecFloatParse(NodeData node, GraphData graph, Dictionary<string, object> ctx)
+        {
+            var s = GetPort(node, graph, ctx, "input")?.ToString();
+            return float.TryParse(s, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var f)
+                ? f
+                : 0f;
+        }
+
+        private static object? ExecToString(NodeData node, GraphData graph, Dictionary<string, object> ctx)
+        {
+            var v = GetPort(node, graph, ctx, "input");
+            return v?.ToString() ?? "";
+        }
 
         private static object GetPort(NodeData node, GraphData graph, Dictionary<string, object> context, string portName)
         {

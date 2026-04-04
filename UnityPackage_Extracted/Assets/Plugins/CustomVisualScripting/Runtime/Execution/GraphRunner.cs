@@ -30,7 +30,7 @@ namespace CustomVisualScripting.Runtime.Execution
                         continue;
 
                     // Узлы потока не вычисляют значение; полноценное ветвление — отдельная задача.
-                    if (node.Type is NodeType.FlowIf or NodeType.FlowElse)
+                    if (node.Type is NodeType.FlowIf or NodeType.FlowElse or NodeType.FlowFor or NodeType.FlowWhile)
                         continue;
 
                     var result = _executor.ExecuteNode(node, _context, graph);

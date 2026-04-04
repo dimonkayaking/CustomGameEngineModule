@@ -99,6 +99,8 @@ namespace CustomVisualScripting.Integration
                 // Flow
                 case NodeType.FlowIf:
                 case NodeType.FlowElse:
+                case NodeType.FlowFor:
+                case NodeType.FlowWhile:
                     return new Color(0.9f, 0.2f, 0.2f);
                     
                 // Unity
@@ -109,7 +111,16 @@ namespace CustomVisualScripting.Integration
                     
                 // Debug
                 case NodeType.DebugLog:
+                case NodeType.ConsoleWriteLine:
                     return new Color(0.6f, 0.6f, 0.6f);
+
+                case NodeType.IntParse:
+                case NodeType.FloatParse:
+                case NodeType.ToStringConvert:
+                case NodeType.MathfAbs:
+                case NodeType.MathfMax:
+                case NodeType.MathfMin:
+                    return new Color(0.4f, 0.75f, 0.95f);
                     
                 default:
                     return Color.gray;
@@ -153,6 +164,15 @@ namespace CustomVisualScripting.Integration
                 // Flow
                 case NodeType.FlowIf: return "If";
                 case NodeType.FlowElse: return "Else";
+                case NodeType.FlowFor: return "For";
+                case NodeType.FlowWhile: return "While";
+                case NodeType.ConsoleWriteLine: return "Console.WriteLine";
+                case NodeType.IntParse: return "int.Parse";
+                case NodeType.FloatParse: return "float.Parse";
+                case NodeType.ToStringConvert: return "ToString";
+                case NodeType.MathfAbs: return "Mathf.Abs";
+                case NodeType.MathfMax: return "Mathf.Max";
+                case NodeType.MathfMin: return "Mathf.Min";
                 
                 // Unity
                 case NodeType.UnityVector3: return "Vector3";

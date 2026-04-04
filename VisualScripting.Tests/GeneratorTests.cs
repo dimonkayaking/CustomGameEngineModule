@@ -253,4 +253,92 @@ if (x > 5)
         Assert.Contains("x = 0;", output);
         Assert.DoesNotContain("else", output);
     }
+
+    [Fact]
+    public void ForLoopWithCompoundAssignmentInBody()
+    {
+        var code = @"
+int sum = 0;
+for (int i = 0; i < 10; i++)
+{
+    sum += i;
+}";
+        var output = Roundtrip(code);
+        Assert.Contains("for (int i = 0; i < 10; i++)", output);
+        Assert.Contains("sum = sum + i;", output);
+    }
+
+    [Fact]
+    public void WhileLoop()
+    {
+        var code = @"
+int n = 3;
+while (n > 0)
+{
+    n--;
+}";
+        var output = Roundtrip(code);
+        Assert.Contains("while (n > 0)", output);
+        Assert.Contains("n = n - 1;", output);
+    }
+
+    [Fact]
+    public void ConsoleWriteLineStatement()
+    {
+        var code = @"Console.WriteLine(""Hello"");";
+        var output = Roundtrip(code);
+        Assert.Contains("Console.WriteLine(\"Hello\");", output);
+    }
+
+    [Fact]
+    public void IntParseRoundtrip()
+    {
+        var code = @"int x = int.Parse(""42"");";
+        var output = Roundtrip(code);
+        Assert.Contains("int x = int.Parse(\"42\");", output);
+    }
+
+    [Fact]
+    public void FloatParseRoundtrip()
+    {
+        var code = @"float f = float.Parse(""3.14"");";
+        var output = Roundtrip(code);
+        Assert.Contains("float f = float.Parse(\"3.14\");", output);
+    }
+
+    [Fact]
+    public void ToStringRoundtrip()
+    {
+        var code = @"
+int n = 5;
+string s = n.ToString();";
+        var output = Roundtrip(code);
+        Assert.Contains("string s = n.ToString();", output);
+    }
+
+    [Fact]
+    public void CompoundAssignmentPlus()
+    {
+        var code = @"
+int a = 1;
+a += 2;";
+        var output = Roundtrip(code);
+        Assert.Contains("a = a + 2;", output);
+    }
+
+    [Fact]
+    public void MathfAbsMaxMinRoundtrip()
+    {
+        var code = @"
+float x = 1f;
+float y = Mathf.Abs(x);
+float z = Mathf.Max(x, y);
+float w = Mathf.Min(x, y);";
+        var result = _parser.Parse(code);
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors));
+        var output = _generator.Generate(result.Graph);
+        Assert.Contains("Math.Abs", output);
+        Assert.Contains("Math.Max", output);
+        Assert.Contains("Math.Min", output);
+    }
 }

@@ -2,7 +2,21 @@
 
 Привет, команда!
 
-Ниже — **актуальное состояние** после перехода парсера на **Roslyn** и согласования контракта графа с тимлидом (строго C#, без циклов и степени на этом этапе). Старые формулировки про «19 нод с VariableInt / Debug.Log» и 12 тестов **заменены** этим текстом.
+Ниже — **актуальное состояние** после перехода парсера на **Roslyn** и согласования контракта графа с тимлидом. **Sprint 2 (4–16 апреля 2026):** циклы, встроенные методы, порты потока, исправление сохранения JSON с `Vector2`.
+
+---
+
+## Обновление от 04.04.2026 — Sprint 2 (Backend 1, до предзащиты)
+
+| Область | Изменение |
+|--------|-----------|
+| **Сохранение графа** | Исправлена ошибка Newtonsoft `Self referencing loop … Vector2.normalized`: [`Vector2JsonConverter`](UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/Integration/Vector2JsonConverter.cs) + `ReferenceLoopHandling.Ignore` в [`GraphSaver`](UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/Integration/GraphSaver.cs). |
+| **`NodeType`** | Добавлены: `FlowFor`, `FlowWhile`, `ConsoleWriteLine`, `IntParse`, `FloatParse`, `ToStringConvert`, `MathfAbs`, `MathfMax`, `MathfMin` (Core + Unity `Core/Models` синхронизированы). |
+| **Парсер** | `for` / `while` с портами `execIn`/`execOut`, `init`/`condition`/`increment`/`body` (for), `condition`/`body` (while). Составные присваивания `+=`…`%=`, пре/пост `++`/`--`. Вызовы: `Console.WriteLine`, `int.Parse` / `float.Parse`, `.ToString()`, `Mathf.Abs`/`Max`/`Min`. В обёртку парсера добавлена **заглушка `Mathf`**, чтобы разбор работал вне Unity. |
+| **Генератор** | `SimpleCodeGenerator`: `for`/`while`, `Console.WriteLine`, встроенные методы; `System.Math` для Abs/Max/Min в генерируемом C#; корни потока — любая первая инструкция без входящего `execIn` (в т.ч. одиночный `Console.WriteLine`). Составные операции в коде дают эквивалент (`a += 2` → `a = a + 2`). |
+| **Runtime (Unity)** | `NodeExecutor`: `ConsoleWriteLine` → `Debug.Log`, `IntParse`/`FloatParse`/`ToStringConvert`, `Mathf*`. `GraphRunner` пропускает `FlowFor`/`FlowWhile` (как `FlowIf`), без полноценного исполнения циклов в рантайме. |
+| **Интеграция / редактор** | `GraphConverter`, `GraphSerializer` — цвета и подписи для новых типов. |
+| **Тесты** | [`GeneratorTests.cs`](VisualScripting.Tests/GeneratorTests.cs) — **27** тестов (`dotnet test` зелёный). |
 
 ---
 
@@ -35,41 +49,52 @@
 | Compare (Equal, Greater, Less, NotEqual, >=, <=) | `left`, `right` | `result` |
 | And / Or | `left`, `right` | `result` |
 | Not | `input` | `result` |
-| If | `execIn`, `condition` | `true`, `false`, `execOut` (база) |
+| If | `execIn`, `condition` | `true`, `false` (ветки потока); далее по цепочке `execOut` у листьевых инструкций |
 | Else | `execIn` | `execOut` |
+| **For** | `execIn`, данные: `init`, `condition`, `increment` | `body` (поток в тело), `execOut` (после цикла) |
+| **While** | `execIn`, `condition` | `body`, `execOut` |
+| **Console.WriteLine** | `execIn`, `message` | `execOut` |
+| **int.Parse / float.Parse** | `input` | `output` |
+| **ToString** | `input` | `output` |
+| **Mathf.Abs** | `input` | `output` |
+| **Mathf.Max / Min** | `inputA`, `inputB` | `output` |
+| VariableSet | `execIn`, `value` | `execOut` |
 | Прочие (Unity, переменные) | см. существующие ноды | — |
 
 `VariableName`: непустой только у литерала с объявлением и у **корневого** узла результата присваивания; у промежуточных операций — пустая строка.
 
 ---
 
-## Скоуп MVP парсера (что разбирается сейчас)
+## Скоуп парсера (актуально после Sprint 2)
 
 **Поддерживается:**
 
-- Объявления `int x = …`, `float`, `string`, `bool` **с инициализатором**.
-- Простое присваивание `z = …` (правая часть — выражение MVP).
+- Объявления `int x = …`, `float`, `string`, `bool` **с инициализатором** и **без инициализатора** (`int x;`).
+- Простое присваивание `z = …` и **составные** `+=`, `-=`, `*=`, `/=`, `%=`.
+- Префиксный/постфиксный `++` / `--` (как цепочка `Math` + `VariableSet`).
 - Арифметика: `+ - * / %`, скобки, приоритеты из Roslyn.
 - Сравнения: `== != > < >= <=`.
 - Логика: `&&`, `||`, `!`.
-- `if` / `else if` / `else` с блоками или одной инструкцией.
-- Вложенные `if`.
+- `if` / `else if` / `else`, вложенные `if`.
+- Циклы **`for`**, **`while`** (в т.ч. вложенные в блоки).
+- Вызовы: **`Console.WriteLine(...)`**, **`int.Parse`**, **`float.Parse`**, **`.ToString()`**, **`Mathf.Abs` / `Max` / `Min`** (через заглушку `Mathf` в обёртке парсера).
 
-**Пока не поддерживается парсером (ошибка или «неподдерживаемая конструкция»):**
+**Пока не поддерживается или ограничено:**
 
-- Циклы, вызовы методов (`Debug.Log`, `Math.Pow`, …), Unity-специфика (`transform`, `Vector3`, …).
-- Объявление без инициализатора, составные присваивания (`+=`), и т.д.
+- Прочие вызовы методов (`Debug.Log`, `Math.Pow`, произвольные API), Unity-специфика (`transform`, `Vector3`, …).
+- Массивы, дженерики, `switch`, `return`, async — по-прежнему вне скоупа.
+- **Рантайм:** ветвление и циклы в `GraphRunner` не исполняются по полной семантике C# (узлы потока пропускаются или упрощённо); для демо опираться на **генератор кода** и тесты.
 
-Оператор степени в стиле Python и циклы в ТЗ MVP v3 **не входят**.
+Оператор степени в стиле Python **не входит**.
 
 ---
 
-## Что НЕ входит в текущий MVP парсера (напоминание)
+## Что НЕ входит в текущий скоуп (напоминание)
 
-- Циклы (`for`, `while`)
-- Массивы, коллекции, методы, дженерики
+- Произвольные вызовы методов и Unity API, кроме перечисленных выше
+- Массивы, коллекции, обобщённые типы
 - `switch`, `return`, корутины, async
-- Генерация полного демо-скрипта с `transform` / `Debug.Log` из старого описания — до появления поддержки в парсере или отдельной задачи
+- Полное пошаговое исполнение циклов/ветвлений в `GraphRunner` без доработки Backend 2
 
 ---
 
@@ -98,7 +123,7 @@ else
 
 ### Backend 1 (парсер / мост) — статус
 
-Основной объём по плану MVP v3 в репозитории **влит**. Дальше — доработки по согласованию (например, расширение генератора, новые конструкции).
+Sprint 2 (ТЗ 4–16 апреля): циклы, встроенные методы, порты потока в рёбрах, исправление JSON/`Vector2`, тесты расширены. Дальше — согласование с Backend 2 / Fullstack по **визуальным** нодам `For`/`While`/`Console.WriteLine` и по исполнению циклов в рантайме.
 
 ### Backend 2 (генератор / рантайм)
 
@@ -139,7 +164,7 @@ string code = generator.GenerateCode(graph);
 
 | Файл / класс | Количество | Назначение |
 |----------------|------------|------------|
-| `RoslynParserMvpTests.cs` | 5 | Арифметика с `%`, if + логика, вложенный if, синтаксическая ошибка, roundtrip `int x,y,z` через генератор. |
+| `GeneratorTests.cs` | 27 | Арифметика, `%`, сравнения, логика, `if`/`else if`/`else`, объявление без инициализатора, `for` + составное присваивание в теле, `while` + декремент, `Console.WriteLine`, `int`/`float`.Parse, `ToString`, `+=`, `Mathf` Abs/Max/Min, roundtrip через `SimpleCodeGenerator`. |
 
 Запуск: из корня репозитория `dotnet test VisualScripting.Tests/VisualScripting.Tests.csproj`.
 
@@ -152,7 +177,7 @@ VisualScripting.Core/           ← парсер, модели, SimpleCodeGenera
 UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/
 ├── Core/                      ← зеркало моделей и RoslynCodeParser (исходники; в Unity нужны ещё DLL Roslyn)
 ├── Editor/Nodes/              ← визуальные ноды (GraphProcessor)
-├── Integration/               ← ParserBridge, GraphConverter
+├── Integration/               ← ParserBridge, GraphConverter, GraphSaver (+ Vector2JsonConverter)
 └── Runtime/Execution/         ← NodeExecutor, GraphRunner
 ```
 
@@ -160,4 +185,4 @@ UnityPackage_Extracted/Assets/Plugins/CustomVisualScripting/
 
 ---
 
-Если нужна короткая выжимка для чата команды — можно переслать только раздел **«Обновление от 28.03.2026»** и таблицу **«Контракт портов»**.
+Если нужна короткая выжимка для чата команды — переслать раздел **«Обновление от 04.04.2026 — Sprint 2»** и таблицу **«Контракт портов»**.

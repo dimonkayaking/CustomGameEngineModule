@@ -11,7 +11,9 @@ namespace CustomVisualScripting.Integration
         {
             Formatting = Formatting.Indented,
             TypeNameHandling = TypeNameHandling.Auto,
-            NullValueHandling = NullValueHandling.Ignore
+            NullValueHandling = NullValueHandling.Ignore,
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            Converters = { new Vector2JsonConverter() }
         };
         
         public static bool SaveToJson(CompleteGraphData data, string path)
