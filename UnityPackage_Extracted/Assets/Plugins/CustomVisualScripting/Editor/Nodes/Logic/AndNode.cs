@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Logic
 {
-    [System.Serializable, NodeMenuItem("Logic/And")]
+    [Serializable, NodeMenuItem("Logic/And")]
     public class AndNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.LogicalAnd;
@@ -24,6 +25,13 @@ namespace CustomVisualScripting.Editor.Nodes.Logic
         protected override void Process()
         {
             result = left && right;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "bool";
+            return nodeData;
         }
     }
 }

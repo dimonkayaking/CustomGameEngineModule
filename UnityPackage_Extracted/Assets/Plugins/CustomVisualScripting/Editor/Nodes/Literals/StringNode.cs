@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,10 +6,13 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Literals
 {
-    [System.Serializable, NodeMenuItem("Literals/String")]
+    [NodeMenuItem("Literals/String")]
     public class StringNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.LiteralString;
+
+        [Input("inputValue")]
+        public object inputValue;
 
         [Output("output")]
         public string output;
@@ -19,6 +23,10 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
 
         protected override void Process()
         {
+            if (inputValue != null)
+            {
+                stringValue = inputValue.ToString();
+            }
             output = stringValue;
         }
 

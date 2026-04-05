@@ -9,10 +9,9 @@ using CustomVisualScripting.Editor.Nodes.Flow;
 using CustomVisualScripting.Editor.Nodes.Literals;
 using CustomVisualScripting.Editor.Nodes.Math;
 using CustomVisualScripting.Editor.Nodes.Comparison;
-using CustomVisualScripting.Editor.Nodes.Logic;
-using CustomVisualScripting.Editor.Nodes.Variables;
-using CustomVisualScripting.Editor.Nodes.Debug;
 using CustomVisualScripting.Editor.Nodes.Conversion;
+using CustomVisualScripting.Editor.Nodes.Logic;
+using CustomVisualScripting.Editor.Nodes.Debug;
 using CustomVisualScripting.Editor.Nodes.Unity;
 
 namespace CustomVisualScripting.Editor.Nodes
@@ -94,41 +93,56 @@ namespace CustomVisualScripting.Editor.Nodes
         {
             CustomBaseNode node = data.Type switch
             {
+                // Литералы
                 NodeType.LiteralInt => BaseNode.CreateFromType<IntNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.LiteralFloat => BaseNode.CreateFromType<FloatNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.LiteralBool => BaseNode.CreateFromType<BoolNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.LiteralString => BaseNode.CreateFromType<StringNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Математика
                 NodeType.MathAdd => BaseNode.CreateFromType<AddNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathSubtract => BaseNode.CreateFromType<SubtractNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathMultiply => BaseNode.CreateFromType<MultiplyNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathDivide => BaseNode.CreateFromType<DivideNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathModulo => BaseNode.CreateFromType<ModuloNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Сравнения
                 NodeType.CompareEqual => BaseNode.CreateFromType<EqualNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.CompareNotEqual => BaseNode.CreateFromType<NotEqualNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.CompareGreater => BaseNode.CreateFromType<GreaterNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.CompareGreaterOrEqual => BaseNode.CreateFromType<GreaterOrEqualNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.CompareLess => BaseNode.CreateFromType<LessNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.CompareLessOrEqual => BaseNode.CreateFromType<LessOrEqualNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Логика
                 NodeType.LogicalAnd => BaseNode.CreateFromType<AndNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.LogicalOr => BaseNode.CreateFromType<OrNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.LogicalNot => BaseNode.CreateFromType<NotNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Flow
                 NodeType.FlowIf => BaseNode.CreateFromType<IfNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.FlowFor => BaseNode.CreateFromType<ForNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.FlowWhile => BaseNode.CreateFromType<WhileNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.ConsoleWriteLine => BaseNode.CreateFromType<ConsoleWriteLineNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Debug
                 NodeType.DebugLog => BaseNode.CreateFromType<DebugLogNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Конвертация
                 NodeType.IntParse => BaseNode.CreateFromType<IntParseNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.FloatParse => BaseNode.CreateFromType<FloatParseNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.ToStringConvert => BaseNode.CreateFromType<ToStringNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Mathf
                 NodeType.MathfAbs => BaseNode.CreateFromType<MathfAbsNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathfMax => BaseNode.CreateFromType<MathfMaxNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.MathfMin => BaseNode.CreateFromType<MathfMinNode>(Vector2.zero) as CustomBaseNode,
-                NodeType.VariableDeclaration => BaseNode.CreateFromType<VariableDeclarationNode>(Vector2.zero) as CustomBaseNode,
-                NodeType.VariableGet => BaseNode.CreateFromType<GetVariableNode>(Vector2.zero) as CustomBaseNode,
-                NodeType.VariableSet => BaseNode.CreateFromType<SetVariableNode>(Vector2.zero) as CustomBaseNode,
+                
+                // Unity
                 NodeType.UnityVector3 => BaseNode.CreateFromType<Vector3CreateNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.UnityGetPosition => BaseNode.CreateFromType<GetPositionNode>(Vector2.zero) as CustomBaseNode,
                 NodeType.UnitySetPosition => BaseNode.CreateFromType<SetPositionNode>(Vector2.zero) as CustomBaseNode,
+                
                 _ => null
             };
             
@@ -149,7 +163,6 @@ namespace CustomVisualScripting.Editor.Nodes
                 NodeType.FlowIf or NodeType.FlowFor or NodeType.FlowWhile => "#9C27B0",
                 NodeType.DebugLog or NodeType.ConsoleWriteLine => "#F44336",
                 NodeType.UnityGetPosition or NodeType.UnitySetPosition or NodeType.UnityVector3 => "#00BCD4",
-                NodeType.VariableGet or NodeType.VariableSet or NodeType.VariableDeclaration => "#3F51B5",
                 NodeType.IntParse or NodeType.FloatParse or NodeType.ToStringConvert or NodeType.MathfAbs or NodeType.MathfMax or NodeType.MathfMin => "#00ACC1",
                 _ => "#757575"
             };
@@ -185,9 +198,6 @@ namespace CustomVisualScripting.Editor.Nodes
                 NodeType.UnityGetPosition => "Get Position",
                 NodeType.UnitySetPosition => "Set Position",
                 NodeType.UnityVector3 => "Vector3",
-                NodeType.VariableGet => "Get Variable",
-                NodeType.VariableSet => "Set Variable",
-                NodeType.VariableDeclaration => "Declare Variable",
                 NodeType.IntParse => "int.Parse",
                 NodeType.FloatParse => "float.Parse",
                 NodeType.ToStringConvert => "ToString",

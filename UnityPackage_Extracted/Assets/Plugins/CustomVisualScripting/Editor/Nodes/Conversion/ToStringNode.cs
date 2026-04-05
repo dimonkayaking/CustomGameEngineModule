@@ -23,5 +23,12 @@ namespace CustomVisualScripting.Editor.Nodes.Conversion
         {
             output = input?.ToString() ?? "";
         }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "string";
+            return nodeData;
+        }
     }
 }

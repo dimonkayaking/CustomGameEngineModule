@@ -51,10 +51,6 @@ namespace CustomVisualScripting.Runtime.Execution
                     NodeType.MathfMax => UnityEngine.Mathf.Max(GetFloat(inputs, "inputA"), GetFloat(inputs, "inputB")),
                     NodeType.MathfMin => UnityEngine.Mathf.Min(GetFloat(inputs, "inputA"), GetFloat(inputs, "inputB")),
                     
-                    NodeType.VariableGet => GetVariable(GetString(inputs, "Variable Name")),
-                    NodeType.VariableSet => SetVariableAndReturn(GetString(inputs, "Variable Name"), GetObject(inputs, "Value")),
-                    NodeType.VariableDeclaration => SetVariableAndReturn(GetString(inputs, "Variable Name"), GetObject(inputs, "Value")),
-                    
                     NodeType.UnityVector3 => new UnityEngine.Vector3(GetFloat(inputs, "X"), GetFloat(inputs, "Y"), GetFloat(inputs, "Z")),
                     NodeType.UnityGetPosition => GetGameObject(inputs, "GameObject")?.transform.position ?? UnityEngine.Vector3.zero,
                     NodeType.UnitySetPosition => SetPositionAndReturn(inputs),
@@ -82,12 +78,6 @@ namespace CustomVisualScripting.Runtime.Execution
             var pos = GetVector3(inputs, "Position");
             if (go != null) go.transform.position = pos;
             return go;
-        }
-        
-        private object SetVariableAndReturn(string name, object value)
-        {
-            _variables[name] = value;
-            return value;
         }
         
         private float GetFloat(Dictionary<string, object> inputs, string key)

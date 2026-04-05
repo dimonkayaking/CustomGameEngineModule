@@ -7,6 +7,8 @@ namespace CustomVisualScripting.Windows.Views
     {
         public Button ParseButton { get; private set; }
         public Button GenerateButton { get; private set; }
+        public Button RunButton { get; private set; }
+        public Button StopButton { get; private set; }
         public Button SaveButton { get; private set; }
         public Button SaveAsButton { get; private set; }
         public Button LoadButton { get; private set; }
@@ -31,10 +33,21 @@ namespace CustomVisualScripting.Windows.Views
             GenerateButton.style.marginRight = 5;
             Add(GenerateButton);
             
+            RunButton = new Button { text = "▶ Run" };
+            RunButton.style.marginRight = 5;
+            RunButton.style.backgroundColor = new Color(0.2f, 0.6f, 0.2f);
+            Add(RunButton);
+            
+            StopButton = new Button { text = "⏹ Stop" };
+            StopButton.style.marginRight = 5;
+            StopButton.style.backgroundColor = new Color(0.6f, 0.2f, 0.2f);
+            StopButton.SetEnabled(false);
+            Add(StopButton);
+            
             SaveButton = new Button { text = "Сохранить" };
             SaveButton.style.marginRight = 5;
             Add(SaveButton);
-
+            
             SaveAsButton = new Button { text = "Сохранить как" };
             SaveAsButton.style.marginRight = 5;
             Add(SaveAsButton);
@@ -53,6 +66,23 @@ namespace CustomVisualScripting.Windows.Views
             _statusLabel.style.flexGrow = 1;
             _statusLabel.style.unityTextAlign = TextAnchor.MiddleRight;
             Add(_statusLabel);
+        }
+        
+        public void SetRunMode(bool isRunning)
+        {
+            RunButton.SetEnabled(!isRunning);
+            StopButton.SetEnabled(isRunning);
+            
+            if (isRunning)
+            {
+                RunButton.style.backgroundColor = new Color(0.5f, 0.5f, 0.5f);
+                StopButton.style.backgroundColor = new Color(0.8f, 0.3f, 0.3f);
+            }
+            else
+            {
+                RunButton.style.backgroundColor = new Color(0.2f, 0.6f, 0.2f);
+                StopButton.style.backgroundColor = new Color(0.6f, 0.2f, 0.2f);
+            }
         }
         
         public void SetStatusNormal(string message)

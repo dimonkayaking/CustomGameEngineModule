@@ -28,7 +28,6 @@ namespace VisualScripting.Core.Generators
             var hasIncomingExec = new HashSet<string>(
                 graph.Edges.Where(e => e.ToPort == "execIn").Select(e => e.ToNodeId));
 
-            // Первая инструкция в методе не имеет входящего execIn; одиночный Console.WriteLine тоже.
             var roots = graph.Nodes
                 .Where(n => !hasIncomingExec.Contains(n.Id) && IsStatementEntryNode(n))
                 .ToList();
@@ -46,20 +45,30 @@ namespace VisualScripting.Core.Generators
         private string GenerateFallback()
         {
             var sb = new StringBuilder();
-            foreach (var node in _graph.Nodes)
+            
+            // Находим все переменные (ноды с VariableName)
+            var variables = _graph.Nodes.Where(n => !string.IsNullOrEmpty(n.VariableName)).OrderBy(n => n.Id).ToList();
+            
+            foreach (var node in variables)
             {
-                if (IsLiteral(node.Type) && !string.IsNullOrEmpty(node.VariableName))
+                // Ищем, откуда приходит значение
+                var incomingEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputValue");
+                string valueExpr;
+                
+                if (incomingEdge != null && _map.TryGetValue(incomingEdge.FromNodeId, out var sourceNode))
                 {
-                    sb.AppendLine($"{KeywordFor(node.ValueType)} {node.VariableName} = {LiteralRhs(node)};");
-                    _declared.Add(node.VariableName);
+                    valueExpr = GetExpressionForNode(sourceNode);
                 }
-                else if (IsBinaryOp(node.Type) && !string.IsNullOrEmpty(node.VariableName))
+                else
                 {
-                    var type = InferResultType(node);
-                    sb.AppendLine($"{KeywordFor(type)} {node.VariableName} = {EmitStmtExpr(node.Id)};");
-                    _declared.Add(node.VariableName);
+                    valueExpr = GetDefaultValue(node.ValueType);
                 }
+                
+                string type = GetKeywordForType(node.ValueType);
+                sb.AppendLine($"{type} {node.VariableName} = {valueExpr};");
+                _declared.Add(node.VariableName);
             }
+            
             return sb.ToString().TrimEnd();
         }
 
@@ -79,15 +88,6 @@ namespace VisualScripting.Core.Generators
                     break;
 
                 case NodeType.FlowElse:
-                    break;
-
-                case NodeType.VariableDeclaration:
-                    _declared.Add(node.VariableName);
-                    sb.AppendLine($"{pad}{KeywordFor(node.ValueType)} {node.VariableName};");
-                    break;
-
-                case NodeType.VariableSet:
-                    EmitVarSet(node, sb, pad);
                     break;
 
                 case NodeType.FlowFor:
@@ -113,25 +113,28 @@ namespace VisualScripting.Core.Generators
                 EmitChain(next.ToNodeId, sb, indent);
         }
 
-        private void EmitVarSet(NodeData node, StringBuilder sb, string pad)
-        {
-            var valueEdge = _graph.Edges.FirstOrDefault(
-                e => e.ToNodeId == node.Id && e.ToPort == "value");
-            if (valueEdge != null)
-            {
-                var expr = EmitCondExpr(valueEdge.FromNodeId);
-                sb.AppendLine($"{pad}{node.VariableName} = {expr};");
-            }
-            _declared.Add(node.VariableName);
-        }
-
         private void EmitValueStatement(NodeData node, StringBuilder sb, string pad)
         {
             var vn = node.VariableName;
             if (string.IsNullOrEmpty(vn))
                 return;
 
-            if (IsLiteral(node.Type))
+            var incomingEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputValue");
+            
+            if (incomingEdge != null && _map.TryGetValue(incomingEdge.FromNodeId, out var sourceNode))
+            {
+                string valueExpr = GetExpressionForNode(sourceNode);
+                
+                if (_declared.Contains(vn))
+                    sb.AppendLine($"{pad}{vn} = {valueExpr};");
+                else
+                {
+                    string type = GetKeywordForType(node.ValueType);
+                    sb.AppendLine($"{pad}{type} {vn} = {valueExpr};");
+                    _declared.Add(vn);
+                }
+            }
+            else if (IsLiteral(node.Type))
             {
                 if (_declared.Contains(vn))
                     sb.AppendLine($"{pad}{vn} = {LiteralRhs(node)};");
@@ -140,23 +143,8 @@ namespace VisualScripting.Core.Generators
                     _declared.Add(vn);
                     sb.AppendLine($"{pad}{KeywordFor(node.ValueType)} {vn} = {LiteralRhs(node)};");
                 }
-                return;
             }
-
-            if (IsBinaryOp(node.Type) || node.Type == NodeType.LogicalNot)
-            {
-                var expr = EmitStmtExpr(node.Id);
-                if (_declared.Contains(vn))
-                    sb.AppendLine($"{pad}{vn} = {expr};");
-                else
-                {
-                    _declared.Add(vn);
-                    sb.AppendLine($"{pad}{KeywordFor(InferResultType(node))} {vn} = {expr};");
-                }
-                return;
-            }
-
-            if (IsBuiltinExpressionNode(node.Type))
+            else if (IsBinaryOp(node.Type) && !string.IsNullOrEmpty(vn))
             {
                 var expr = EmitStmtExpr(node.Id);
                 if (_declared.Contains(vn))
@@ -167,6 +155,35 @@ namespace VisualScripting.Core.Generators
                     sb.AppendLine($"{pad}{KeywordFor(InferResultType(node))} {vn} = {expr};");
                 }
             }
+        }
+
+        private string GetExpressionForNode(NodeData node)
+        {
+            if (node == null) return "???";
+            
+            if (IsLiteral(node.Type))
+                return LiteralRhs(node);
+            
+            if (IsMath(node.Type))
+            {
+                var leftEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputA");
+                var rightEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputB");
+                
+                if (leftEdge == null || rightEdge == null) return "???";
+                
+                var leftNode = _map.GetValueOrDefault(leftEdge.FromNodeId);
+                var rightNode = _map.GetValueOrDefault(rightEdge.FromNodeId);
+                
+                if (leftNode == null || rightNode == null) return "???";
+                
+                string leftExpr = GetExpressionForNode(leftNode);
+                string rightExpr = GetExpressionForNode(rightNode);
+                string op = MathOp(node.Type);
+                
+                return $"{leftExpr} {op} {rightExpr}";
+            }
+            
+            return "???";
         }
 
         private void EmitIf(NodeData ifNode, StringBuilder sb, int indent, bool inline = false)
@@ -250,14 +267,6 @@ namespace VisualScripting.Core.Generators
             if (IsLiteral(n.Type) && !string.IsNullOrEmpty(n.VariableName))
                 return $"{KeywordFor(n.ValueType)} {n.VariableName} = {LiteralRhs(n)}";
 
-            if (n.Type == NodeType.VariableSet)
-            {
-                var ve = _graph.Edges.FirstOrDefault(
-                    e => e.ToNodeId == fromId && e.ToPort == "value");
-                if (ve != null)
-                    return $"{n.VariableName} = {EmitCondExpr(ve.FromNodeId)}";
-            }
-
             return EmitStmtExpr(fromId);
         }
 
@@ -269,30 +278,6 @@ namespace VisualScripting.Core.Generators
                 return "";
 
             var fromId = incEdge.FromNodeId;
-            var setEdge = _graph.Edges.FirstOrDefault(
-                e => e.FromNodeId == fromId && e.FromPort == "output" && e.ToPort == "value");
-            if (setEdge != null && _map.TryGetValue(setEdge.ToNodeId, out var setN) &&
-                setN.Type == NodeType.VariableSet)
-            {
-                var name = setN.VariableName;
-                var a = Input(fromId, "inputA");
-                var b = Input(fromId, "inputB");
-                if (a != null && b != null &&
-                    _map.TryGetValue(b, out var lit) && lit.Type == NodeType.LiteralInt && lit.Value == "1")
-                {
-                    var leftName = EmitExpr(a).Trim();
-                    if (leftName == name)
-                    {
-                        if (_map[fromId].Type == NodeType.MathAdd)
-                            return $"{name}++";
-                        if (_map[fromId].Type == NodeType.MathSubtract)
-                            return $"{name}--";
-                    }
-                }
-
-                return $"{name} = {EmitStmtExpr(fromId)}";
-            }
-
             return EmitStmtExpr(fromId);
         }
 
@@ -370,12 +355,6 @@ namespace VisualScripting.Core.Generators
                 if (i == null) return "???";
                 return $"!{EmitExpr(i)}";
             }
-
-            if (node.Type == NodeType.VariableSet && !string.IsNullOrEmpty(node.VariableName))
-                return node.VariableName;
-
-            if (node.Type == NodeType.VariableDeclaration && !string.IsNullOrEmpty(node.VariableName))
-                return node.VariableName;
 
             if (node.Type == NodeType.IntParse)
             {
@@ -475,6 +454,22 @@ namespace VisualScripting.Core.Generators
             "string" => "string",
             _ => "int"
         };
+        
+        private static string GetKeywordForType(string? vt) => vt switch
+        {
+            "float" => "float",
+            "bool" => "bool",
+            "string" => "string",
+            _ => "int"
+        };
+        
+        private static string GetDefaultValue(string? vt) => vt switch
+        {
+            "float" => "0f",
+            "bool" => "false",
+            "string" => "\"\"",
+            _ => "0"
+        };
 
         private static string MathOp(NodeType t) => t switch
         {
@@ -520,14 +515,10 @@ namespace VisualScripting.Core.Generators
             t is NodeType.IntParse or NodeType.FloatParse or NodeType.ToStringConvert
                 or NodeType.MathfAbs or NodeType.MathfMax or NodeType.MathfMin;
 
-        /// <summary>Узел, с которого начинается цепочка исполнения (первая инструкция или нет входящего execIn).</summary>
         private static bool IsStatementEntryNode(NodeData n)
         {
             if (n.Type is NodeType.FlowIf or NodeType.FlowElse or NodeType.FlowFor or NodeType.FlowWhile
                 or NodeType.ConsoleWriteLine)
-                return true;
-
-            if (n.Type == NodeType.VariableDeclaration || n.Type == NodeType.VariableSet)
                 return true;
 
             if (IsLiteral(n.Type) && !string.IsNullOrEmpty(n.VariableName))

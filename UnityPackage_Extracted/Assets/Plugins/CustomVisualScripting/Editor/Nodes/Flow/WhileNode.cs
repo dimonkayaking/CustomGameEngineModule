@@ -1,5 +1,6 @@
 using System;
 using GraphProcessor;
+using UnityEngine;
 using VisualScripting.Core.Models;
 using CustomVisualScripting.Editor.Nodes.Base;
 
@@ -10,16 +11,12 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
     {
         public override NodeType NodeType => NodeType.FlowWhile;
 
-        [Input("condition", allowMultiple = false)]
+        [Input("condition")]
         public bool condition;
 
-        [Output("body", allowMultiple = false)]
+        [Output("body")]
         public object body;
 
         public override string name => "While Loop";
-
-        protected override void Process()
-        {
-        }
     }
 }

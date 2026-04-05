@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Unity
 {
-    [System.Serializable, NodeMenuItem("Unity/Create Vector3")]
+    [Serializable, NodeMenuItem("Unity/Create Vector3")]
     public class Vector3CreateNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.UnityVector3;

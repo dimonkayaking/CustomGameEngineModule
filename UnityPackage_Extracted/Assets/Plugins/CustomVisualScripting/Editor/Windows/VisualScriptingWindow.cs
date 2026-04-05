@@ -17,8 +17,8 @@ using CustomVisualScripting.Editor.Nodes.Flow;
 using CustomVisualScripting.Editor.Nodes.Debug;
 using CustomVisualScripting.Editor.Nodes.Logic;
 using CustomVisualScripting.Editor.Nodes.Conversion;
-using CustomVisualScripting.Editor.Nodes.Variables;
 using CustomVisualScripting.Editor.Nodes.Unity;
+using CustomVisualScripting.Runtime.Execution;
 using VisualScripting.Core.Models;
 using CustomToolbar = CustomVisualScripting.Windows.Views.ToolbarView;
 
@@ -38,6 +38,8 @@ namespace CustomVisualScripting.Editor.Windows
         
         private string _currentFilePath;
         private bool _hasUnsavedChanges = false;
+        
+        private GraphRunner _runner;
         
         [MenuItem("Tools/Visual Scripting")]
         public static void OpenWindow()
@@ -97,6 +99,8 @@ namespace CustomVisualScripting.Editor.Windows
             _toolbar = new CustomToolbar();
             _toolbar.ParseButton.clicked += OnParse;
             _toolbar.GenerateButton.clicked += OnGenerate;
+            _toolbar.RunButton.clicked += OnRun;
+            _toolbar.StopButton.clicked += OnStop;
             _toolbar.SaveButton.clicked += OnSave;
             _toolbar.SaveAsButton.clicked += OnSaveAs;
             _toolbar.LoadButton.clicked += OnLoad;
@@ -169,6 +173,54 @@ namespace CustomVisualScripting.Editor.Windows
             _codeEditor.Code = code;
             
             _toolbar.SetStatusSuccess("Код сгенерирован");
+        }
+        
+        private void OnRun()
+        {
+            if (_currentGraph?.LogicGraph == null || _currentGraph.LogicGraph.Nodes.Count == 0)
+            {
+                _toolbar.SetStatusError("Нет графа для выполнения");
+                return;
+            }
+            
+            _toolbar.SetRunMode(true);
+            _toolbar.SetStatusWarning("Выполнение...");
+            
+            _runner = new GraphRunner();
+            
+            _runner.OnLogMessage += (message, type) => {
+                if (_consoleView != null)
+                {
+                    _consoleView.AddMessage(message, type);
+                }
+            };
+            
+            try
+            {
+                _runner.Run(_currentGraph.LogicGraph);
+                _toolbar.SetStatusSuccess("Выполнение завершено");
+            }
+            catch (Exception e)
+            {
+                _toolbar.SetStatusError($"Ошибка: {e.Message}");
+                Debug.LogError($"[VS] Ошибка выполнения: {e.Message}");
+            }
+            finally
+            {
+                _toolbar.SetRunMode(false);
+                _runner = null;
+            }
+        }
+        
+        private void OnStop()
+        {
+            if (_runner != null)
+            {
+                _runner.Clear();
+                _runner = null;
+            }
+            _toolbar.SetRunMode(false);
+            _toolbar.SetStatusNormal("Выполнение остановлено");
         }
         
         private void OnSave()
@@ -289,6 +341,8 @@ namespace CustomVisualScripting.Editor.Windows
                 
                 if (fromNode == null || toNode == null) continue;
                 
+                Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
+                
                 _currentGraph.LogicGraph.Edges.Add(new EdgeData
                 {
                     FromNodeId = fromNode.NodeId,
@@ -330,8 +384,8 @@ namespace CustomVisualScripting.Editor.Windows
             try
             {
                 _internalGraph = ScriptableObject.CreateInstance<BaseGraph>();
+                var nodeMap = new Dictionary<string, BaseNode>();
                 
-                // Создаём ноды
                 if (_currentGraph?.LogicGraph?.Nodes != null)
                 {
                     foreach (var nodeData in _currentGraph.LogicGraph.Nodes)
@@ -352,6 +406,7 @@ namespace CustomVisualScripting.Editor.Windows
                                 stringNode.stringValue = nodeData.Value;
                             
                             _internalGraph.AddNode(node);
+                            nodeMap[nodeData.Id] = node;
                         }
                     }
                 }
@@ -360,10 +415,56 @@ namespace CustomVisualScripting.Editor.Windows
                 _graphView.Initialize(_internalGraph);
                 _graphView.style.flexGrow = 1;
                 
-                // НЕ ВОССТАНАВЛИВАЕМ СВЯЗИ АВТОМАТИЧЕСКИ
-                // Пользователь соединит порты вручную
+                if (_currentGraph?.LogicGraph?.Edges != null && nodeMap.Count > 0)
+                {
+                    foreach (var edgeData in _currentGraph.LogicGraph.Edges)
+                    {
+                        if (edgeData.FromPort == "execOut" || edgeData.FromPort == "execIn" ||
+                            edgeData.ToPort == "execOut" || edgeData.ToPort == "execIn")
+                        {
+                            continue;
+                        }
+                        
+                        if (!nodeMap.TryGetValue(edgeData.FromNodeId, out var fromNode)) continue;
+                        if (!nodeMap.TryGetValue(edgeData.ToNodeId, out var toNode)) continue;
+                        
+                        if (!_graphView.nodeViewsPerNode.TryGetValue(fromNode, out var fromNodeView)) continue;
+                        if (!_graphView.nodeViewsPerNode.TryGetValue(toNode, out var toNodeView)) continue;
+                        
+                        Debug.Log($"[VS] Восстанавливаем связь: {edgeData.FromNodeId}.{edgeData.FromPort} → {edgeData.ToNodeId}.{edgeData.ToPort}");
+                        
+                        var fromPort = fromNodeView.outputPortViews.FirstOrDefault(p => p.fieldName == edgeData.FromPort || p.portName == edgeData.FromPort);
+                        var toPort = toNodeView.inputPortViews.FirstOrDefault(p => p.fieldName == edgeData.ToPort || p.portName == edgeData.ToPort);
+                        
+                        if (fromPort == null)
+                        {
+                            Debug.LogWarning($"[VS] Не найден выходной порт: '{edgeData.FromPort}' в ноде {fromNode.GetType().Name}. Доступные: {string.Join(", ", fromNodeView.outputPortViews.Select(p => p.fieldName))}");
+                            continue;
+                        }
+                        if (toPort == null)
+                        {
+                            Debug.LogWarning($"[VS] Не найден входной порт: '{edgeData.ToPort}' в ноде {toNode.GetType().Name}. Доступные: {string.Join(", ", toNodeView.inputPortViews.Select(p => p.fieldName))}");
+                            continue;
+                        }
+                        
+                        bool alreadyConnected = false;
+                        foreach (var existingEdge in _graphView.edgeViews)
+                        {
+                            if (existingEdge.output == fromPort && existingEdge.input == toPort)
+                            {
+                                alreadyConnected = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!alreadyConnected)
+                        {
+                            _graphView.Connect(fromPort, toPort);
+                            Debug.Log($"[VS] Связь создана: {edgeData.FromNodeId}.{edgeData.FromPort} → {edgeData.ToNodeId}.{edgeData.ToPort}");
+                        }
+                    }
+                }
                 
-                // Восстанавливаем позиции
                 if (_currentGraph?.VisualNodes != null)
                 {
                     foreach (var nodeView in _graphView.nodeViews)
@@ -385,7 +486,7 @@ namespace CustomVisualScripting.Editor.Windows
                 _graphContainer.Add(_graphView);
                 
                 int nodeCount = _internalGraph.nodes.Count;
-                _toolbar.SetStatusSuccess($"Граф готов — {nodeCount} нод. Соедините порты вручную.");
+                _toolbar.SetStatusSuccess($"Граф готов — {nodeCount} нод");
             }
             catch (Exception e)
             {
@@ -444,9 +545,6 @@ namespace CustomVisualScripting.Editor.Windows
                 case NodeType.MathfAbs: return new MathfAbsNode();
                 case NodeType.MathfMax: return new MathfMaxNode();
                 case NodeType.MathfMin: return new MathfMinNode();
-                case NodeType.VariableDeclaration: return new VariableDeclarationNode();
-                case NodeType.VariableGet: return new GetVariableNode();
-                case NodeType.VariableSet: return new SetVariableNode();
                 case NodeType.UnityVector3: return new Vector3CreateNode();
                 case NodeType.UnityGetPosition: return new GetPositionNode();
                 case NodeType.UnitySetPosition: return new SetPositionNode();

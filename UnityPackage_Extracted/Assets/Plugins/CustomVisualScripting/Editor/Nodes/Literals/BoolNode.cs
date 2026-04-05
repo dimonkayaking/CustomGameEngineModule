@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,10 +6,13 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Literals
 {
-    [System.Serializable, NodeMenuItem("Literals/Bool")]
+    [NodeMenuItem("Literals/Bool")]
     public class BoolNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.LiteralBool;
+
+        [Input("inputValue")]
+        public object inputValue;
 
         [Output("output")]
         public bool output;
@@ -19,6 +23,17 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
 
         protected override void Process()
         {
+            if (inputValue != null)
+            {
+                boolValue = inputValue switch
+                {
+                    bool b => b,
+                    int i => i != 0,
+                    float f => f != 0,
+                    string s => bool.TryParse(s, out bool result) ? result : false,
+                    _ => false
+                };
+            }
             output = boolValue;
         }
 

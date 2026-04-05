@@ -61,14 +61,12 @@ namespace CustomVisualScripting.Integration
         {
             switch (type)
             {
-                // Литералы
                 case NodeType.LiteralBool:
                 case NodeType.LiteralInt:
                 case NodeType.LiteralFloat:
                 case NodeType.LiteralString:
                     return new Color(0.3f, 0.7f, 0.3f);
                     
-                // Математика
                 case NodeType.MathAdd:
                 case NodeType.MathSubtract:
                 case NodeType.MathMultiply:
@@ -76,7 +74,6 @@ namespace CustomVisualScripting.Integration
                 case NodeType.MathModulo:
                     return new Color(0.2f, 0.8f, 0.4f);
                     
-                // Сравнения
                 case NodeType.CompareEqual:
                 case NodeType.CompareGreater:
                 case NodeType.CompareLess:
@@ -90,26 +87,17 @@ namespace CustomVisualScripting.Integration
                 case NodeType.LogicalNot:
                     return new Color(0.5f, 0.65f, 1f);
                     
-                // Переменные
-                case NodeType.VariableDeclaration:
-                case NodeType.VariableGet:
-                case NodeType.VariableSet:
-                    return new Color(0.7f, 0.3f, 0.8f);
-                    
-                // Flow
                 case NodeType.FlowIf:
                 case NodeType.FlowElse:
                 case NodeType.FlowFor:
                 case NodeType.FlowWhile:
                     return new Color(0.9f, 0.2f, 0.2f);
                     
-                // Unity
                 case NodeType.UnityVector3:
                 case NodeType.UnityGetPosition:
                 case NodeType.UnitySetPosition:
                     return new Color(0.2f, 0.7f, 0.9f);
                     
-                // Debug
                 case NodeType.DebugLog:
                 case NodeType.ConsoleWriteLine:
                     return new Color(0.6f, 0.6f, 0.6f);
@@ -131,20 +119,17 @@ namespace CustomVisualScripting.Integration
         {
             switch (type)
             {
-                // Литералы
                 case NodeType.LiteralBool: return "Bool";
                 case NodeType.LiteralInt: return "Int";
                 case NodeType.LiteralFloat: return "Float";
                 case NodeType.LiteralString: return "String";
                 
-                // Математика
                 case NodeType.MathAdd: return "Add";
                 case NodeType.MathSubtract: return "Subtract";
                 case NodeType.MathMultiply: return "Multiply";
                 case NodeType.MathDivide: return "Divide";
                 case NodeType.MathModulo: return "Modulo";
                 
-                // Сравнения
                 case NodeType.CompareEqual: return "Equal";
                 case NodeType.CompareGreater: return "Greater";
                 case NodeType.CompareLess: return "Less";
@@ -156,17 +141,12 @@ namespace CustomVisualScripting.Integration
                 case NodeType.LogicalOr: return "Or";
                 case NodeType.LogicalNot: return "Not";
                 
-                // Переменные
-                case NodeType.VariableDeclaration: return "Declare";
-                case NodeType.VariableGet: return "Get Variable";
-                case NodeType.VariableSet: return "Set Variable";
-                
-                // Flow
                 case NodeType.FlowIf: return "If";
                 case NodeType.FlowElse: return "Else";
                 case NodeType.FlowFor: return "For";
                 case NodeType.FlowWhile: return "While";
                 case NodeType.ConsoleWriteLine: return "Console.WriteLine";
+                
                 case NodeType.IntParse: return "int.Parse";
                 case NodeType.FloatParse: return "float.Parse";
                 case NodeType.ToStringConvert: return "ToString";
@@ -174,12 +154,10 @@ namespace CustomVisualScripting.Integration
                 case NodeType.MathfMax: return "Mathf.Max";
                 case NodeType.MathfMin: return "Mathf.Min";
                 
-                // Unity
                 case NodeType.UnityVector3: return "Vector3";
                 case NodeType.UnityGetPosition: return "Get Position";
                 case NodeType.UnitySetPosition: return "Set Position";
                 
-                // Debug
                 case NodeType.DebugLog: return "Debug Log";
                 
                 default: return type.ToString();

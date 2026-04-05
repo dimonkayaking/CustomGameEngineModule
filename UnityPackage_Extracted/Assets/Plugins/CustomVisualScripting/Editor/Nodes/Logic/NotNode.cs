@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Logic
 {
-    [System.Serializable, NodeMenuItem("Logic/Not")]
+    [Serializable, NodeMenuItem("Logic/Not")]
     public class NotNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.LogicalNot;
@@ -21,6 +22,13 @@ namespace CustomVisualScripting.Editor.Nodes.Logic
         protected override void Process()
         {
             result = !input;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "bool";
+            return nodeData;
         }
     }
 }

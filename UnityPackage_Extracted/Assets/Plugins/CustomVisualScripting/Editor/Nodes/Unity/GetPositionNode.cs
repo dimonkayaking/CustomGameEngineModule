@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Unity
 {
-    [System.Serializable, NodeMenuItem("Unity/Get Position")]
+    [Serializable, NodeMenuItem("Unity/Get Position")]
     public class GetPositionNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.UnityGetPosition;

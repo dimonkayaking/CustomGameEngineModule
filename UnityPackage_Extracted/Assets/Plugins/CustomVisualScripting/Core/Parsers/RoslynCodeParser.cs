@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using VisualScripting.Core.Models;
+using UnityEngine;
 
 namespace VisualScripting.Core.Parsers
 {
@@ -26,14 +27,14 @@ namespace VisualScripting.Core.Parsers
         private int _nodeCounter;
         private GraphData _graph = null!;
         private List<string> _errors = null!;
-        private readonly Dictionary<string, string> _symbolToNodeId = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _variableToNodeId = new Dictionary<string, string>();
 
         public ParseResult Parse(string code)
         {
             _nodeCounter = 0;
             _graph = new GraphData();
             _errors = new List<string>();
-            _symbolToNodeId.Clear();
+            _variableToNodeId.Clear();
 
             if (string.IsNullOrWhiteSpace(code))
             {
@@ -42,15 +43,11 @@ namespace VisualScripting.Core.Parsers
             }
 
             var wrapped = WrapPrefix + code + WrapSuffix;
-
-            var tree = CSharpSyntaxTree.ParseText(
-                wrapped,
-                new CSharpParseOptions(LanguageVersion.Latest));
+            var tree = CSharpSyntaxTree.ParseText(wrapped, new CSharpParseOptions(LanguageVersion.Latest));
 
             foreach (var d in tree.GetDiagnostics().Where(x => x.Severity == DiagnosticSeverity.Error))
             {
-                _errors.Add(
-                    $"{d.GetMessage()} ({FormatUserLocation(tree, d.Location.SourceSpan)})");
+                _errors.Add($"{d.GetMessage()} ({FormatUserLocation(tree, d.Location.SourceSpan)})");
             }
 
             if (_errors.Count > 0)
@@ -71,8 +68,7 @@ namespace VisualScripting.Core.Parsers
             return Result();
         }
 
-        private ParseResult Result() =>
-            new ParseResult { Graph = _graph, Errors = _errors };
+        private ParseResult Result() => new ParseResult { Graph = _graph, Errors = _errors };
 
         private static string FormatUserLocation(SyntaxTree tree, TextSpan span)
         {
@@ -154,92 +150,133 @@ namespace VisualScripting.Core.Parsers
 
         private void ReportUnsupported(SyntaxNode node)
         {
-            _errors.Add(
-                $"Неподдерживаемая конструкция ({FormatUserLocation(node.SyntaxTree, node.Span)}): {node.Kind()}. Поддерживаются: объявления, присваивания, +=/-=, ++/--, if/else, for/while, вызовы Parse/ToString/Mathf, Console.WriteLine.");
+            _errors.Add($"Неподдерживаемая конструкция ({FormatUserLocation(node.SyntaxTree, node.Span)}): {node.Kind()}");
         }
 
         private bool IsExecutionNode(NodeType type)
         {
-            return type == NodeType.FlowIf ||
-                   type == NodeType.FlowElse ||
-                   type == NodeType.FlowFor ||
-                   type == NodeType.FlowWhile ||
+            return type == NodeType.FlowIf || type == NodeType.FlowElse ||
+                   type == NodeType.FlowFor || type == NodeType.FlowWhile ||
                    type == NodeType.ConsoleWriteLine;
+        }
+
+        private bool IsLiteral(NodeType type)
+        {
+            return type == NodeType.LiteralInt || type == NodeType.LiteralFloat ||
+                   type == NodeType.LiteralBool || type == NodeType.LiteralString;
+        }
+
+        private bool IsMath(NodeType t)
+        {
+            return t == NodeType.MathAdd || t == NodeType.MathSubtract || t == NodeType.MathMultiply ||
+                   t == NodeType.MathDivide || t == NodeType.MathModulo;
+        }
+
+        private string CreateVariableNode(NodeType type, string value, string valueType, string variableName)
+        {
+            var id = NewId();
+            _graph.Nodes.Add(new NodeData
+            {
+                Id = id,
+                Type = type,
+                Value = value,
+                ValueType = valueType,
+                VariableName = variableName
+            });
+            return id;
+        }
+
+        private string CreateMathNode(NodeType opType, string leftId, string rightId)
+        {
+            var id = NewId();
+            _graph.Nodes.Add(new NodeData
+            {
+                Id = id,
+                Type = opType,
+                Value = "",
+                ValueType = "float",
+                VariableName = ""
+            });
+            AddEdge(leftId, "output", id, "inputA");
+            AddEdge(rightId, "output", id, "inputB");
+            return id;
         }
 
         private FlowHost? VisitLocalDeclaration(LocalDeclarationStatementSyntax local, string? prevNode, string prevPort)
         {
             FlowHost? last = null;
+
             foreach (var v in local.Declaration.Variables)
             {
                 var name = v.Identifier.Text;
-
-                if (_symbolToNodeId.ContainsKey(name))
+                var typeStr = local.Declaration.Type.ToString().Trim();
+                var valueType = typeStr switch
                 {
-                    _errors.Add(
-                        $"Повторное объявление переменной «{name}» ({FormatUserLocation(local.SyntaxTree, v.Identifier.Span)}).");
+                    "float" => "float",
+                    "bool" => "bool",
+                    "string" => "string",
+                    _ => "int"
+                };
+
+                NodeType varNodeType = valueType switch
+                {
+                    "int" => NodeType.LiteralInt,
+                    "float" => NodeType.LiteralFloat,
+                    "bool" => NodeType.LiteralBool,
+                    "string" => NodeType.LiteralString,
+                    _ => NodeType.LiteralInt
+                };
+
+                if (_variableToNodeId.TryGetValue(name, out var existingId))
+                {
+                    if (v.Initializer != null)
+                    {
+                        var valueId = VisitExpression(v.Initializer.Value, false, null, out var unsupported);
+                        if (!unsupported && valueId != null)
+                        {
+                            AddEdge(valueId, "output", existingId, "inputValue");
+                        }
+                    }
                     continue;
                 }
 
                 if (v.Initializer == null)
                 {
-                    var typeStr = local.Declaration.Type.ToString().Trim();
-                    var vType = typeStr switch
+                    string defaultValue = valueType switch
                     {
-                        "float" => "float",
-                        "bool" => "bool",
-                        "string" => "string",
-                        _ => "int"
+                        "int" => "0",
+                        "float" => "0",
+                        "bool" => "false",
+                        "string" => "",
+                        _ => "0"
                     };
-
-                    var declId = NewId();
-                    _graph.Nodes.Add(new NodeData
-                    {
-                        Id = declId,
-                        Type = NodeType.VariableDeclaration,
-                        Value = "",
-                        ValueType = vType,
-                        VariableName = name
-                    });
-                    _symbolToNodeId[name] = declId;
-
-                    var declHost = new FlowHost { NodeId = declId };
-                    
-                    // Только execution-ноды получают exec связи
-                    if (IsExecutionNode(NodeType.VariableDeclaration))
-                    {
-                        if (last != null)
-                            AddEdge(last.NodeId, last.ExecOutPort, declHost.NodeId, "execIn");
-                        else if (prevNode != null)
-                            AddEdge(prevNode, prevPort, declHost.NodeId, "execIn");
-                    }
-                    
-                    last = declHost;
-                    continue;
+                    var nodeId = CreateVariableNode(varNodeType, defaultValue, valueType, name);
+                    _variableToNodeId[name] = nodeId;
+                    last = new FlowHost { NodeId = nodeId };
                 }
-
-                var rootId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
-                if (unsupported)
-                    continue;
-
-                if (rootId == null)
-                    continue;
-
-                _symbolToNodeId[name] = rootId;
-
-                var host = new FlowHost { NodeId = rootId };
-                
-                // Только execution-ноды получают exec связи
-                var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
-                if (rootNode != null && IsExecutionNode(rootNode.Type))
+                else
                 {
-                    if (last != null)
-                        AddEdge(last.NodeId, last.ExecOutPort, host.NodeId, "execIn");
-                    else if (prevNode != null)
-                        AddEdge(prevNode, prevPort, host.NodeId, "execIn");
-                }
+                    var valueId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
+                    if (unsupported || valueId == null) continue;
 
-                last = host;
+                    var valueNode = _graph.Nodes.FirstOrDefault(n => n.Id == valueId);
+
+                    if (valueNode != null && IsLiteral(valueNode.Type))
+                    {
+                        string literalValue = valueNode.Value;
+                        var nodeId = CreateVariableNode(varNodeType, literalValue, valueType, name);
+                        _variableToNodeId[name] = nodeId;
+                        _graph.Nodes.Remove(valueNode);
+                        last = new FlowHost { NodeId = nodeId };
+                    }
+                    else
+                    {
+                        var nodeId = CreateVariableNode(varNodeType, "0", valueType, name);
+                        _variableToNodeId[name] = nodeId;
+                        AddEdge(valueId, "output", nodeId, "inputValue");
+                        last = new FlowHost { NodeId = nodeId };
+                    }
+                }
             }
 
             return last;
@@ -252,35 +289,23 @@ namespace VisualScripting.Core.Parsers
             if (expr is InvocationExpressionSyntax inv && IsConsoleWriteLine(inv))
                 return VisitConsoleWriteLine(inv, prevNode, prevPort);
 
-            if (expr is AssignmentExpressionSyntax assign && assign.Left is IdentifierNameSyntax)
+            if (expr is AssignmentExpressionSyntax assign && assign.Left is IdentifierNameSyntax idLeft)
             {
+                var name = idLeft.Identifier.Text;
+
                 if (assign.Kind() == SyntaxKind.SimpleAssignmentExpression)
                 {
-                    var idLeft = (IdentifierNameSyntax)assign.Left;
-                    var name = idLeft.Identifier.Text;
-                    var rootId = VisitExpression(assign.Right, false, null, out var unsupported);
-                    if (unsupported || rootId == null)
-                        return null;
+                    var valueId = VisitExpression(assign.Right, false, null, out var unsupported);
+                    if (unsupported || valueId == null) return null;
 
-                    var setId = NewId();
-                    _graph.Nodes.Add(new NodeData
+                    if (!_variableToNodeId.TryGetValue(name, out var varId))
                     {
-                        Id = setId,
-                        Type = NodeType.VariableSet,
-                        Value = "",
-                        ValueType = "",
-                        VariableName = name
-                    });
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), setId, "value");
+                        _errors.Add($"Неизвестная переменная «{name}»");
+                        return null;
+                    }
 
-                    _symbolToNodeId[name] = setId;
-
-                    var host = new FlowHost { NodeId = setId };
-                    
-                    // VariableSet не execution-нода, поэтому exec связи не добавляем
-                    // if (prevNode != null) - НЕ ДОБАВЛЯЕМ
-                    
-                    return host;
+                    AddEdge(valueId, "output", varId, "inputValue");
+                    return new FlowHost { NodeId = varId };
                 }
 
                 if (assign.Kind() is SyntaxKind.AddAssignmentExpression or SyntaxKind.SubtractAssignmentExpression
@@ -295,22 +320,14 @@ namespace VisualScripting.Core.Parsers
                 (post.IsKind(SyntaxKind.PostIncrementExpression) || post.IsKind(SyntaxKind.PostDecrementExpression)) &&
                 post.Operand is IdentifierNameSyntax idPost)
             {
-                return VisitIncrementDecrementStatement(
-                    idPost,
-                    increment: post.IsKind(SyntaxKind.PostIncrementExpression),
-                    prevNode,
-                    prevPort);
+                return VisitIncrementDecrementStatement(idPost, true, prevNode, prevPort);
             }
 
             if (expr is PrefixUnaryExpressionSyntax pre &&
                 (pre.IsKind(SyntaxKind.PreIncrementExpression) || pre.IsKind(SyntaxKind.PreDecrementExpression)) &&
                 pre.Operand is IdentifierNameSyntax idPre)
             {
-                return VisitIncrementDecrementStatement(
-                    idPre,
-                    increment: pre.IsKind(SyntaxKind.PreIncrementExpression),
-                    prevNode,
-                    prevPort);
+                return VisitIncrementDecrementStatement(idPre, true, prevNode, prevPort);
             }
 
             ReportUnsupported(stmt);
@@ -331,13 +348,12 @@ namespace VisualScripting.Core.Parsers
             string? msgId;
             if (inv.ArgumentList.Arguments.Count == 0)
             {
-                msgId = CreateLiteralStringNode("");
+                msgId = CreateLiteralNode(NodeType.LiteralString, "", "string", "");
             }
             else
             {
                 msgId = VisitExpression(inv.ArgumentList.Arguments[0].Expression, false, null, out var u);
-                if (u || msgId == null)
-                    return null;
+                if (u || msgId == null) return null;
             }
 
             var nodeId = NewId();
@@ -349,9 +365,8 @@ namespace VisualScripting.Core.Parsers
                 ValueType = "",
                 VariableName = ""
             });
-            AddEdge(msgId, GetDataOutPortForNodeId(msgId), nodeId, "message");
+            AddEdge(msgId, "output", nodeId, "message");
 
-            // ConsoleWriteLine - execution-нода, добавляем exec связь
             var host = new FlowHost { NodeId = nodeId };
             if (prevNode != null)
                 AddEdge(prevNode, prevPort, host.NodeId, "execIn");
@@ -359,16 +374,16 @@ namespace VisualScripting.Core.Parsers
             return host;
         }
 
-        private string CreateLiteralStringNode(string text)
+        private string CreateLiteralNode(NodeType type, string value, string valueType, string variableName)
         {
             var id = NewId();
             _graph.Nodes.Add(new NodeData
             {
                 Id = id,
-                Type = NodeType.LiteralString,
-                Value = text,
-                ValueType = "string",
-                VariableName = ""
+                Type = type,
+                Value = value,
+                ValueType = valueType,
+                VariableName = variableName
             });
             return id;
         }
@@ -406,89 +421,37 @@ namespace VisualScripting.Core.Parsers
                 return null;
             }
 
-            if (!_symbolToNodeId.TryGetValue(name, out var leftId))
+            if (!_variableToNodeId.TryGetValue(name, out var varId))
             {
-                _errors.Add(
-                    $"Неизвестная переменная «{name}» ({FormatUserLocation(assign.SyntaxTree, assign.Span)}).");
+                _errors.Add($"Неизвестная переменная «{name}»");
                 return null;
             }
 
             var rightId = VisitExpression(assign.Right, false, null, out var unsupported);
-            if (unsupported || rightId == null)
-                return null;
+            if (unsupported || rightId == null) return null;
 
-            var opId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = opId,
-                Type = opType.Value,
-                Value = "",
-                ValueType = "",
-                VariableName = ""
-            });
-            AddEdge(leftId, GetDataOutPortForNodeId(leftId), opId, "inputA");
-            AddEdge(rightId, GetDataOutPortForNodeId(rightId), opId, "inputB");
+            var opId = CreateMathNode(opType.Value, varId, rightId);
+            AddEdge(opId, "output", varId, "inputValue");
 
-            var setId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = setId,
-                Type = NodeType.VariableSet,
-                Value = "",
-                ValueType = "",
-                VariableName = name
-            });
-            AddEdge(opId, "output", setId, "value");
-            _symbolToNodeId[name] = setId;
-
-            var host = new FlowHost { NodeId = setId };
-            // VariableSet не execution-нода - exec связи не добавляем
-            return host;
+            return new FlowHost { NodeId = varId };
         }
 
-        private FlowHost? VisitIncrementDecrementStatement(
-            IdentifierNameSyntax idExpr,
-            bool increment,
-            string? prevNode,
-            string prevPort)
+        private FlowHost? VisitIncrementDecrementStatement(IdentifierNameSyntax idExpr, bool increment, string? prevNode, string prevPort)
         {
             var name = idExpr.Identifier.Text;
-            if (!_symbolToNodeId.TryGetValue(name, out var varNodeId))
+
+            if (!_variableToNodeId.TryGetValue(name, out var varId))
             {
-                _errors.Add(
-                    $"Неизвестная переменная «{name}» ({FormatUserLocation(idExpr.SyntaxTree, idExpr.Span)}).");
+                _errors.Add($"Неизвестная переменная «{name}»");
                 return null;
             }
 
             var oneId = CreateLiteralIntOne();
             var opType = increment ? NodeType.MathAdd : NodeType.MathSubtract;
-            var opId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = opId,
-                Type = opType,
-                Value = "",
-                ValueType = "",
-                VariableName = ""
-            });
-            AddEdge(varNodeId, GetDataOutPortForNodeId(varNodeId), opId, "inputA");
-            AddEdge(oneId, "output", opId, "inputB");
+            var opId = CreateMathNode(opType, varId, oneId);
+            AddEdge(opId, "output", varId, "inputValue");
 
-            var setId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = setId,
-                Type = NodeType.VariableSet,
-                Value = "",
-                ValueType = "",
-                VariableName = name
-            });
-            AddEdge(opId, "output", setId, "value");
-            _symbolToNodeId[name] = setId;
-
-            var host = new FlowHost { NodeId = setId };
-            // VariableSet не execution-нода - exec связи не добавляем
-            return host;
+            return new FlowHost { NodeId = varId };
         }
 
         private FlowHost? VisitForStatement(ForStatementSyntax forStmt, string? prevNode, string prevPort)
@@ -503,7 +466,6 @@ namespace VisualScripting.Core.Parsers
                 VariableName = ""
             });
 
-            // For - execution-нода, добавляем exec связь
             if (prevNode != null)
                 AddEdge(prevNode, prevPort, forId, "execIn");
 
@@ -513,14 +475,14 @@ namespace VisualScripting.Core.Parsers
             {
                 var condRoot = VisitExpression(forStmt.Condition, false, null, out var badCond);
                 if (!badCond && condRoot != null)
-                    AddEdge(condRoot, GetDataOutPortForNodeId(condRoot), forId, "condition");
+                    AddEdge(condRoot, "result", forId, "condition");
             }
 
             foreach (var inc in forStmt.Incrementors)
             {
                 var incRoot = VisitIncrementExpression(inc, out var ui);
                 if (!ui && incRoot != null)
-                    AddEdge(incRoot, GetDataOutPortForNodeId(incRoot), forId, "increment");
+                    AddEdge(incRoot, "output", forId, "increment");
             }
 
             var bodyStmts = ExpandStatement(forStmt.Statement);
@@ -536,54 +498,29 @@ namespace VisualScripting.Core.Parsers
                 foreach (var v in forStmt.Declaration.Variables)
                 {
                     var name = v.Identifier.Text;
-                    if (_symbolToNodeId.ContainsKey(name))
-                    {
-                        _errors.Add(
-                            $"Повторное объявление переменной «{name}» ({FormatUserLocation(forStmt.SyntaxTree, v.Identifier.Span)}).");
-                        continue;
-                    }
 
                     if (v.Initializer == null)
                         continue;
 
-                    var rootId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
-                    if (unsupported || rootId == null)
-                        continue;
+                    var valueId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
+                    if (unsupported || valueId == null) continue;
 
-                    _symbolToNodeId[name] = rootId;
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), forId, "init");
+                    if (!_variableToNodeId.TryGetValue(name, out var varId))
+                    {
+                        varId = CreateVariableNode(NodeType.LiteralInt, "0", "int", name);
+                        _variableToNodeId[name] = varId;
+                    }
+
+                    AddEdge(valueId, "output", varId, "inputValue");
+                    AddEdge(valueId, "output", forId, "init");
                 }
             }
 
             foreach (var initExpr in forStmt.Initializers)
             {
-                if (initExpr is AssignmentExpressionSyntax ae &&
-                    ae.Kind() == SyntaxKind.SimpleAssignmentExpression &&
-                    ae.Left is IdentifierNameSyntax idLeft)
-                {
-                    var n = idLeft.Identifier.Text;
-                    var rootId = VisitExpression(ae.Right, false, null, out var unsupported);
-                    if (unsupported || rootId == null)
-                        continue;
-
-                    var setId = NewId();
-                    _graph.Nodes.Add(new NodeData
-                    {
-                        Id = setId,
-                        Type = NodeType.VariableSet,
-                        Value = "",
-                        ValueType = "",
-                        VariableName = n
-                    });
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), setId, "value");
-                    _symbolToNodeId[n] = setId;
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), forId, "init");
-                    continue;
-                }
-
                 var rid = VisitExpression(initExpr, false, null, out var u2);
                 if (!u2 && rid != null)
-                    AddEdge(rid, GetDataOutPortForNodeId(rid), forId, "init");
+                    AddEdge(rid, "output", forId, "init");
             }
         }
 
@@ -614,39 +551,18 @@ namespace VisualScripting.Core.Parsers
         {
             unsupported = false;
             var name = id.Identifier.Text;
-            if (!_symbolToNodeId.TryGetValue(name, out var varNodeId))
+
+            if (!_variableToNodeId.TryGetValue(name, out var varId))
             {
                 unsupported = true;
-                _errors.Add(
-                    $"Неизвестная переменная «{name}» ({FormatUserLocation(id.SyntaxTree, id.Span)}).");
+                _errors.Add($"Неизвестная переменная «{name}»");
                 return null;
             }
 
             var oneId = CreateLiteralIntOne();
             var opType = increment ? NodeType.MathAdd : NodeType.MathSubtract;
-            var opId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = opId,
-                Type = opType,
-                Value = "",
-                ValueType = "",
-                VariableName = ""
-            });
-            AddEdge(varNodeId, GetDataOutPortForNodeId(varNodeId), opId, "inputA");
-            AddEdge(oneId, "output", opId, "inputB");
-
-            var setId = NewId();
-            _graph.Nodes.Add(new NodeData
-            {
-                Id = setId,
-                Type = NodeType.VariableSet,
-                Value = "",
-                ValueType = "",
-                VariableName = name
-            });
-            AddEdge(opId, "output", setId, "value");
-            _symbolToNodeId[name] = setId;
+            var opId = CreateMathNode(opType, varId, oneId);
+            AddEdge(opId, "output", varId, "inputValue");
 
             return opId;
         }
@@ -663,13 +579,12 @@ namespace VisualScripting.Core.Parsers
                 VariableName = ""
             });
 
-            // While - execution-нода, добавляем exec связь
             if (prevNode != null)
                 AddEdge(prevNode, prevPort, whileId, "execIn");
 
             var condRoot = VisitExpression(whileStmt.Condition, false, null, out var badCond);
             if (!badCond && condRoot != null)
-                AddEdge(condRoot, GetDataOutPortForNodeId(condRoot), whileId, "condition");
+                AddEdge(condRoot, "result", whileId, "condition");
 
             var bodyStmts = ExpandStatement(whileStmt.Statement);
             ProcessBlockStatements(bodyStmts, whileId, "body");
@@ -689,13 +604,12 @@ namespace VisualScripting.Core.Parsers
                 VariableName = ""
             });
 
-            // If - execution-нода, добавляем exec связь
             if (incomingNodeId != null && incomingPort != null)
                 AddEdge(incomingNodeId, incomingPort, ifNodeId, "execIn");
 
             var condRoot = VisitExpression(stmt.Condition, false, null, out var badCond);
             if (!badCond && condRoot != null)
-                AddEdge(condRoot, GetDataOutPortForNodeId(condRoot), ifNodeId, "condition");
+                AddEdge(condRoot, "result", ifNodeId, "condition");
 
             var thenStmts = ExpandStatement(stmt.Statement);
             ProcessBlockStatements(thenStmts, ifNodeId, "true");
@@ -731,10 +645,7 @@ namespace VisualScripting.Core.Parsers
             return new List<StatementSyntax> { statement };
         }
 
-        private void ProcessBlockStatements(
-            IReadOnlyList<StatementSyntax> statements,
-            string entryFromNodeId,
-            string entryFromPort)
+        private void ProcessBlockStatements(IReadOnlyList<StatementSyntax> statements, string entryFromNodeId, string entryFromPort)
         {
             string? prevId = null;
             var prevPort = "execOut";
@@ -817,7 +728,12 @@ namespace VisualScripting.Core.Parsers
                     return CreateLiteralFromLiteralExpression(lit, isRoot ? assignVariableToRoot : null);
 
                 case IdentifierNameSyntax id:
-                    return ResolveIdentifier(id, out unsupported);
+                    var name = id.Identifier.Text;
+                    if (_variableToNodeId.TryGetValue(name, out var nodeId))
+                        return nodeId;
+                    unsupported = true;
+                    _errors.Add($"Неизвестный идентификатор «{name}»");
+                    return null;
 
                 case BinaryExpressionSyntax bin:
                     return VisitBinary(bin, isRoot, assignVariableToRoot, out unsupported);
@@ -825,19 +741,17 @@ namespace VisualScripting.Core.Parsers
                 case PrefixUnaryExpressionSyntax pre when pre.IsKind(SyntaxKind.LogicalNotExpression):
                 {
                     var inner = VisitExpression(pre.Operand, false, null, out unsupported);
-                    if (unsupported || inner == null)
-                        return null;
+                    if (unsupported || inner == null) return null;
                     var notId = NewId();
-                    var vn = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
                     _graph.Nodes.Add(new NodeData
                     {
                         Id = notId,
                         Type = NodeType.LogicalNot,
                         Value = "",
-                        ValueType = "",
-                        VariableName = vn
+                        ValueType = "bool",
+                        VariableName = ""
                     });
-                    AddEdge(inner, GetDataOutPortForNodeId(inner), notId, "input");
+                    AddEdge(inner, "output", notId, "input");
                     return notId;
                 }
 
@@ -846,8 +760,7 @@ namespace VisualScripting.Core.Parsers
 
                 default:
                     unsupported = true;
-                    _errors.Add(
-                        $"Неподдерживаемое выражение ({FormatUserLocation(expr.SyntaxTree, expr.Span)}): {expr.Kind()}.");
+                    _errors.Add($"Неподдерживаемое выражение: {expr.Kind()}");
                     return null;
             }
         }
@@ -877,56 +790,52 @@ namespace VisualScripting.Core.Parsers
             if (opType == null)
             {
                 unsupported = true;
-                _errors.Add(
-                    $"Неподдерживаемый оператор ({FormatUserLocation(bin.SyntaxTree, bin.Span)}): {kind}.");
+                _errors.Add($"Неподдерживаемый оператор: {kind}");
                 return null;
             }
 
+            var leftId = VisitExpression(bin.Left, false, null, out unsupported);
+            if (unsupported || leftId == null) return null;
+
+            var rightId = VisitExpression(bin.Right, false, null, out unsupported);
+            if (unsupported || rightId == null) return null;
+
             var leftPort = IsMath(opType.Value) ? "inputA" : "left";
             var rightPort = IsMath(opType.Value) ? "inputB" : "right";
-
-            var leftId = VisitExpression(bin.Left, false, null, out unsupported);
-            if (unsupported)
-                return null;
-            var rightId = VisitExpression(bin.Right, false, null, out unsupported);
-            if (unsupported)
-                return null;
-
-            if (leftId == null || rightId == null)
-                return null;
+            var resultPort = IsMath(opType.Value) ? "output" : "result";
 
             var opId = NewId();
-            var varName = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
             _graph.Nodes.Add(new NodeData
             {
                 Id = opId,
                 Type = opType.Value,
                 Value = "",
-                ValueType = "",
-                VariableName = varName
+                ValueType = opType.Value.ToString().Contains("Compare") ? "bool" : "float",
+                VariableName = ""
             });
 
-            AddEdge(leftId, GetDataOutPortForNodeId(leftId), opId, leftPort);
-            AddEdge(rightId, GetDataOutPortForNodeId(rightId), opId, rightPort);
+            AddEdge(leftId, "output", opId, leftPort);
+            AddEdge(rightId, "output", opId, rightPort);
+
+            if (isRoot && !string.IsNullOrEmpty(assignVariableToRoot))
+            {
+                if (_variableToNodeId.TryGetValue(assignVariableToRoot, out var varId))
+                {
+                    AddEdge(opId, resultPort, varId, "inputValue");
+                }
+                return opId;
+            }
+
             return opId;
         }
 
-        private static bool IsMath(NodeType t) =>
-            t is NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply
-                or NodeType.MathDivide or NodeType.MathModulo;
-
-        private string? VisitInvocationExpression(
-            InvocationExpressionSyntax inv,
-            bool isRoot,
-            string? assignVariableToRoot,
-            out bool unsupported)
+        private string? VisitInvocationExpression(InvocationExpressionSyntax inv, bool isRoot, string? assignVariableToRoot, out bool unsupported)
         {
             unsupported = false;
             if (inv.Expression is not MemberAccessExpressionSyntax ma)
             {
                 unsupported = true;
-                _errors.Add(
-                    $"Неподдерживаемый вызов ({FormatUserLocation(inv.SyntaxTree, inv.Span)}): ожидается member access.");
+                _errors.Add("Неподдерживаемый вызов");
                 return null;
             }
 
@@ -935,9 +844,9 @@ namespace VisualScripting.Core.Parsers
             if (methodName == "Parse" && ma.Expression is PredefinedTypeSyntax pt)
             {
                 if (pt.Keyword.IsKind(SyntaxKind.IntKeyword))
-                    return CreateParseNode(NodeType.IntParse, inv, isRoot, assignVariableToRoot, out unsupported);
+                    return CreateParseNode(NodeType.IntParse, inv, out unsupported);
                 if (pt.Keyword.IsKind(SyntaxKind.FloatKeyword))
-                    return CreateParseNode(NodeType.FloatParse, inv, isRoot, assignVariableToRoot, out unsupported);
+                    return CreateParseNode(NodeType.FloatParse, inv, out unsupported);
             }
 
             if (ma.Expression is IdentifierNameSyntax mathfId && mathfId.Identifier.Text == "Mathf")
@@ -951,128 +860,100 @@ namespace VisualScripting.Core.Parsers
                 };
 
                 if (mathfType != null)
-                    return CreateMathfNode(mathfType.Value, inv, isRoot, assignVariableToRoot, out unsupported);
+                    return CreateMathfNode(mathfType.Value, inv, out unsupported);
             }
 
             if (methodName == "ToString")
             {
-                return CreateToStringNode(ma.Expression, inv, isRoot, assignVariableToRoot, out unsupported);
+                return CreateToStringNode(ma.Expression, inv, out unsupported);
             }
 
             unsupported = true;
-            _errors.Add(
-                $"Неподдерживаемый вызов метода ({FormatUserLocation(inv.SyntaxTree, inv.Span)}): {methodName}.");
+            _errors.Add($"Неподдерживаемый вызов метода: {methodName}");
             return null;
         }
 
-        private string? CreateParseNode(
-            NodeType parseType,
-            InvocationExpressionSyntax inv,
-            bool isRoot,
-            string? assignVariableToRoot,
-            out bool unsupported)
+        private string? CreateParseNode(NodeType parseType, InvocationExpressionSyntax inv, out bool unsupported)
         {
             unsupported = false;
             if (inv.ArgumentList.Arguments.Count < 1)
             {
                 unsupported = true;
-                _errors.Add(
-                    $"Parse требует аргумент ({FormatUserLocation(inv.SyntaxTree, inv.Span)}).");
                 return null;
             }
 
-            var arg = inv.ArgumentList.Arguments[0].Expression;
-            var argId = VisitExpression(arg, false, null, out unsupported);
-            if (unsupported || argId == null)
-                return null;
+            var argId = VisitExpression(inv.ArgumentList.Arguments[0].Expression, false, null, out unsupported);
+            if (unsupported || argId == null) return null;
 
             var id = NewId();
-            var vn = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
             _graph.Nodes.Add(new NodeData
             {
                 Id = id,
                 Type = parseType,
                 Value = "",
                 ValueType = parseType == NodeType.FloatParse ? "float" : "int",
-                VariableName = vn
+                VariableName = ""
             });
-            AddEdge(argId, GetDataOutPortForNodeId(argId), id, "input");
+            AddEdge(argId, "output", id, "input");
             return id;
         }
 
-        private string? CreateMathfNode(
-            NodeType mathfType,
-            InvocationExpressionSyntax inv,
-            bool isRoot,
-            string? assignVariableToRoot,
-            out bool unsupported)
+        private string? CreateMathfNode(NodeType mathfType, InvocationExpressionSyntax inv, out bool unsupported)
         {
             unsupported = false;
             var args = inv.ArgumentList.Arguments;
+
             if (mathfType == NodeType.MathfAbs)
             {
                 if (args.Count < 1)
                 {
                     unsupported = true;
-                    _errors.Add(
-                        $"Mathf.Abs требует аргумент ({FormatUserLocation(inv.SyntaxTree, inv.Span)}).");
                     return null;
                 }
 
                 var a = VisitExpression(args[0].Expression, false, null, out unsupported);
-                if (unsupported || a == null)
-                    return null;
+                if (unsupported || a == null) return null;
 
                 var id = NewId();
-                var vn = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
                 _graph.Nodes.Add(new NodeData
                 {
                     Id = id,
                     Type = mathfType,
                     Value = "",
                     ValueType = "float",
-                    VariableName = vn
+                    VariableName = ""
                 });
-                AddEdge(a, GetDataOutPortForNodeId(a), id, "input");
+                AddEdge(a, "output", id, "input");
                 return id;
             }
 
             if (args.Count < 2)
             {
                 unsupported = true;
-                _errors.Add(
-                    $"{mathfType} требует два аргумента ({FormatUserLocation(inv.SyntaxTree, inv.Span)}).");
                 return null;
             }
 
             var left = VisitExpression(args[0].Expression, false, null, out unsupported);
-            if (unsupported || left == null)
-                return null;
+            if (unsupported || left == null) return null;
+
             var right = VisitExpression(args[1].Expression, false, null, out unsupported);
-            if (unsupported || right == null)
-                return null;
+            if (unsupported || right == null) return null;
 
             var nodeId = NewId();
-            var varName = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
             _graph.Nodes.Add(new NodeData
             {
                 Id = nodeId,
                 Type = mathfType,
                 Value = "",
                 ValueType = "float",
-                VariableName = varName
+                VariableName = ""
             });
-            AddEdge(left, GetDataOutPortForNodeId(left), nodeId, "inputA");
-            AddEdge(right, GetDataOutPortForNodeId(right), nodeId, "inputB");
+            AddEdge(left, "output", nodeId, "inputA");
+            AddEdge(right, "output", nodeId, "inputB");
             return nodeId;
         }
 
-        private string? CreateToStringNode(
-            ExpressionSyntax? receiver,
-            InvocationExpressionSyntax inv,
-            bool isRoot,
-            string? assignVariableToRoot,
-            out bool unsupported)
+        private string? CreateToStringNode(ExpressionSyntax? receiver, InvocationExpressionSyntax inv, out bool unsupported)
         {
             unsupported = false;
             if (receiver == null)
@@ -1082,34 +963,19 @@ namespace VisualScripting.Core.Parsers
             }
 
             var recvId = VisitExpression(receiver, false, null, out unsupported);
-            if (unsupported || recvId == null)
-                return null;
+            if (unsupported || recvId == null) return null;
 
             var id = NewId();
-            var vn = isRoot && !string.IsNullOrEmpty(assignVariableToRoot) ? assignVariableToRoot! : "";
             _graph.Nodes.Add(new NodeData
             {
                 Id = id,
                 Type = NodeType.ToStringConvert,
                 Value = "",
                 ValueType = "string",
-                VariableName = vn
+                VariableName = ""
             });
-            AddEdge(recvId, GetDataOutPortForNodeId(recvId), id, "input");
+            AddEdge(recvId, "output", id, "input");
             return id;
-        }
-
-        private string? ResolveIdentifier(IdentifierNameSyntax id, out bool unsupported)
-        {
-            unsupported = false;
-            var name = id.Identifier.Text;
-            if (_symbolToNodeId.TryGetValue(name, out var nodeId))
-                return nodeId;
-
-            unsupported = true;
-            _errors.Add(
-                $"Неизвестный идентификатор «{name}» ({FormatUserLocation(id.SyntaxTree, id.Span)}).");
-            return null;
         }
 
         private string? CreateLiteralFromLiteralExpression(LiteralExpressionSyntax lit, string? variableName)
@@ -1150,8 +1016,7 @@ namespace VisualScripting.Core.Parsers
                     break;
 
                 default:
-                    _errors.Add(
-                        $"Неподдерживаемый литерал ({FormatUserLocation(lit.SyntaxTree, lit.Span)}): {lit.Kind()}.");
+                    _errors.Add($"Неподдерживаемый литерал: {lit.Kind()}");
                     return null;
             }
 
@@ -1167,33 +1032,9 @@ namespace VisualScripting.Core.Parsers
             return id;
         }
 
-        private string GetDataOutPortForNodeId(string nodeId)
-        {
-            var n = _graph.Nodes.FirstOrDefault(x => x.Id == nodeId);
-            if (n == null)
-                return "output";
-            return GetDataOutPort(n.Type);
-        }
-
-        private static string GetDataOutPort(NodeType type)
-        {
-            if (IsMath(type))
-                return "output";
-            return type switch
-            {
-                NodeType.LiteralBool or NodeType.LiteralInt or NodeType.LiteralFloat or NodeType.LiteralString => "output",
-                NodeType.CompareEqual or NodeType.CompareGreater or NodeType.CompareLess
-                    or NodeType.CompareNotEqual or NodeType.CompareGreaterOrEqual
-                    or NodeType.CompareLessOrEqual => "result",
-                NodeType.LogicalAnd or NodeType.LogicalOr or NodeType.LogicalNot => "result",
-                NodeType.IntParse or NodeType.FloatParse or NodeType.ToStringConvert
-                    or NodeType.MathfAbs or NodeType.MathfMax or NodeType.MathfMin => "output",
-                _ => "output"
-            };
-        }
-
         private void AddEdge(string fromId, string fromPort, string toId, string toPort)
         {
+            Debug.Log($"[VS] AddEdge: {fromId}.{fromPort} → {toId}.{toPort}");
             _graph.Edges.Add(new EdgeData
             {
                 FromNodeId = fromId,

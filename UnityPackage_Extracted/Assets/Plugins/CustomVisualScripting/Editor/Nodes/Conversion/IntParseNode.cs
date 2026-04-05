@@ -21,10 +21,17 @@ namespace CustomVisualScripting.Editor.Nodes.Conversion
 
         protected override void Process()
         {
-            if (int.TryParse(input, out var result))
+            if (int.TryParse(input, out int result))
                 output = result;
             else
                 output = 0;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "int";
+            return nodeData;
         }
     }
 }

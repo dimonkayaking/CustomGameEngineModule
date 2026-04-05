@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Unity
 {
-    [System.Serializable, NodeMenuItem("Unity/Set Position")]
+    [Serializable, NodeMenuItem("Unity/Set Position")]
     public class SetPositionNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.UnitySetPosition;
@@ -14,10 +15,10 @@ namespace CustomVisualScripting.Editor.Nodes.Unity
         public GameObject gameObject;
 
         [Input("Position")]
-        public new Vector3 position;
+        public Vector3 newPosition;  // ← переименовал, чтобы не скрывать BaseNode.position
 
         [Output("Out")]
-        public GameObject output;  // ← убрал new
+        public GameObject output;
 
         public override string name => "Set Position";
         
@@ -26,7 +27,7 @@ namespace CustomVisualScripting.Editor.Nodes.Unity
             output = gameObject;
             if (gameObject != null)
             {
-                gameObject.transform.position = position;
+                gameObject.transform.position = newPosition;
             }
         }
     }

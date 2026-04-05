@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,10 +6,13 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Literals
 {
-    [System.Serializable, NodeMenuItem("Literals/Int")]
+    [Serializable, NodeMenuItem("Literals/Int")]
     public class IntNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.LiteralInt;
+
+        [Input("inputValue")]  // ← исправлено
+        public object inputValue;
 
         [Output("output")]
         public int output;
@@ -19,6 +23,16 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
 
         protected override void Process()
         {
+            if (inputValue != null)
+            {
+                intValue = inputValue switch
+                {
+                    int i => i,
+                    float f => Mathf.RoundToInt(f),
+                    string s => int.TryParse(s, out int result) ? result : 0,
+                    _ => 0
+                };
+            }
             output = intValue;
         }
 

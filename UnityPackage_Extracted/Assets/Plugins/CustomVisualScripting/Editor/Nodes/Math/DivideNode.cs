@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,17 +6,17 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Math
 {
-    [System.Serializable, NodeMenuItem("Math/Divide")]
+    [Serializable, NodeMenuItem("Math/Divide")]
     public class DivideNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.MathDivide;
 
         [Input("inputA")]
         public float inputA;
-
+        
         [Input("inputB")]
         public float inputB;
-
+        
         [Output("output")]
         public float output;
 
@@ -32,6 +33,13 @@ namespace CustomVisualScripting.Editor.Nodes.Math
             {
                 output = inputA / inputB;
             }
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "float";
+            return nodeData;
         }
     }
 }

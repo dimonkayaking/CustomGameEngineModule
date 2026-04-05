@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,7 +6,7 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Comparison
 {
-    [System.Serializable, NodeMenuItem("Comparison/Not Equal")]
+    [Serializable, NodeMenuItem("Comparison/Not Equal")]
     public class NotEqualNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.CompareNotEqual;
@@ -23,14 +24,14 @@ namespace CustomVisualScripting.Editor.Nodes.Comparison
 
         protected override void Process()
         {
-            if (left != null && right != null)
-            {
-                result = !left.Equals(right);
-            }
-            else
-            {
-                result = (left == null) != (right == null);
-            }
+            result = !(left?.Equals(right) ?? (left == null && right == null));
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "bool";
+            return nodeData;
         }
     }
 }

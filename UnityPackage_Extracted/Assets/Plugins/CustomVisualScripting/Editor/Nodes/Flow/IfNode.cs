@@ -1,5 +1,6 @@
 using System;
 using GraphProcessor;
+using UnityEngine;
 using VisualScripting.Core.Models;
 using CustomVisualScripting.Editor.Nodes.Base;
 
@@ -10,19 +11,15 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
     {
         public override NodeType NodeType => NodeType.FlowIf;
 
-        [Input("condition", allowMultiple = false)]
+        [Input("condition")]
         public bool condition;
 
-        [Output("true", allowMultiple = false)]
+        [Output("true")]
         public object trueBranch;
 
-        [Output("false", allowMultiple = false)]
+        [Output("false")]
         public object falseBranch;
 
         public override string name => "If Statement";
-
-        protected override void Process()
-        {
-        }
     }
 }

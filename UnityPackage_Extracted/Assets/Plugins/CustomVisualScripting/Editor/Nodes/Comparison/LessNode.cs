@@ -1,11 +1,13 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
+using CustomVisualScripting.Editor.Nodes.Comparison;
 using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Comparison
 {
-    [System.Serializable, NodeMenuItem("Comparison/Less")]
+    [Serializable, NodeMenuItem("Comparison/Less")]
     public class LessNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.CompareLess;
@@ -24,6 +26,13 @@ namespace CustomVisualScripting.Editor.Nodes.Comparison
         protected override void Process()
         {
             result = left < right;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "bool";
+            return nodeData;
         }
     }
 }

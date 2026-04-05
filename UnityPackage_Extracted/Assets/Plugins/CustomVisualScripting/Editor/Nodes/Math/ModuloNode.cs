@@ -1,3 +1,4 @@
+using System;
 using GraphProcessor;
 using UnityEngine;
 using VisualScripting.Core.Models;
@@ -5,25 +6,32 @@ using CustomVisualScripting.Editor.Nodes.Base;
 
 namespace CustomVisualScripting.Editor.Nodes.Math
 {
-    [System.Serializable, NodeMenuItem("Math/Modulo")]
+    [Serializable, NodeMenuItem("Math/Modulo")]
     public class ModuloNode : CustomBaseNode
     {
         public override NodeType NodeType => NodeType.MathModulo;
 
         [Input("inputA")]
-        public float a;
-
+        public float inputA;
+        
         [Input("inputB")]
-        public float b;
-
+        public float inputB;
+        
         [Output("output")]
-        public float result;
+        public float output;
 
         public override string name => "Modulo (%)";
 
         protected override void Process()
         {
-            result = a % b;
+            output = inputA % inputB;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "float";
+            return nodeData;
         }
     }
 }

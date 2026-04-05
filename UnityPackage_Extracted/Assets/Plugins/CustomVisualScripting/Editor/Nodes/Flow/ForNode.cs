@@ -1,5 +1,6 @@
 using System;
 using GraphProcessor;
+using UnityEngine;
 using VisualScripting.Core.Models;
 using CustomVisualScripting.Editor.Nodes.Base;
 
@@ -10,22 +11,18 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
     {
         public override NodeType NodeType => NodeType.FlowFor;
 
-        [Input("init", allowMultiple = false)]
+        [Input("init")]
         public object init;
 
-        [Input("condition", allowMultiple = false)]
+        [Input("condition")]
         public bool condition;
 
-        [Input("increment", allowMultiple = false)]
+        [Input("increment")]
         public object increment;
 
-        [Output("body", allowMultiple = false)]
+        [Output("body")]
         public object body;
 
         public override string name => "For Loop";
-
-        protected override void Process()
-        {
-        }
     }
 }

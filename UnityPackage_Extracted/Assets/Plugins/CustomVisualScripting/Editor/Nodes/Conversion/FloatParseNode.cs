@@ -1,7 +1,7 @@
 using System;
-using System.Globalization;
 using GraphProcessor;
 using UnityEngine;
+using System.Globalization;
 using VisualScripting.Core.Models;
 using CustomVisualScripting.Editor.Nodes.Base;
 
@@ -22,10 +22,17 @@ namespace CustomVisualScripting.Editor.Nodes.Conversion
 
         protected override void Process()
         {
-            if (float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+            if (float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out float result))
                 output = result;
             else
                 output = 0f;
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var nodeData = base.ToNodeData();
+            nodeData.ValueType = "float";
+            return nodeData;
         }
     }
 }
