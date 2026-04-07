@@ -12,16 +12,32 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
         public override NodeType NodeType => NodeType.ConsoleWriteLine;
 
         [Input("message")]
-        public string message;
+        public object message;
+
+        public string messageText = "";
 
         public override string name => "Console.WriteLine";
 
         protected override void Process()
         {
-            if (message != null)
+            var text = message?.ToString() ?? messageText ?? "";
+            if (!string.IsNullOrEmpty(text))
             {
-                UnityEngine.Debug.Log(message);
+                UnityEngine.Debug.Log(text);
             }
+        }
+
+        public override void InitializeFromData(NodeData data)
+        {
+            base.InitializeFromData(data);
+            messageText = data.Value ?? "";
+        }
+
+        public override NodeData ToNodeData()
+        {
+            var data = base.ToNodeData();
+            data.Value = messageText ?? "";
+            return data;
         }
     }
 }

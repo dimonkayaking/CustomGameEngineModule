@@ -6,46 +6,49 @@
 
 ---
 
+## Обновление от 07.04.2026 — Sprint 2 доработка (Backend 2, Егор)
+
+**Контекст:** исправления по ТЗ доработки — баги с float, потерянные связи, удалённые ноды, «Run» кнопка, if/else.
+
+| Область | Что сделано |
+|--------|-----------|
+| **Критический баг: пропущенные ноды** | Воссозданы удалённые файлы: `ElseNode.cs`, `VariableDeclarationNode.cs`, `SetVariableNode.cs`, `GetVariableNode.cs`. Без них парсер создавал ноды `VariableSet`/`VariableDeclaration`/`FlowElse`, а `VisualScriptingWindow` не мог отобразить их (возвращал `null`). |
+| **Критический баг: связи не восстанавливались** | `VisualScriptingWindow.UpdateGraphView` фильтровал ВСЕ execution-flow рёбра (`execIn`/`execOut`/`true`/`false`/`body`). Убрана фильтрация → теперь все рёбра (данные + поток выполнения) восстанавливаются в графе. |
+| **Баг float (локаль)** | `FloatNode` использовал системную локаль (русская → запятая вместо точки). Парсер хранит `44.555`, но `float.TryParse` с RU-локалью ожидает `44,555` → значение терялось (всегда 0). Исправлено: `CultureInfo.InvariantCulture` в `InitializeFromData`, `ToNodeData`, `ToString`, `TryParse`. То же — в `SyncFullGraphFromView`. |
+| **Баг: отсутствие `FlowElse` / `VariableSet` / `VariableDeclaration` в `CreateNodeFromData`** | Добавлены три отсутствующих `case` в `CreateNodeFromData`. |
+| **Порты: улучшен поиск** | Вместо `p.fieldName == name \|\| p.portName == name` теперь `p.fieldName == name \|\| p.portData.displayName == name` — корректно находит порты `true`/`false` на `IfNode` (`fieldName = "trueBranch"`, `displayName = "true"`). |
+| **`ConsoleWriteLineNode`** | Добавлено поле `messageText` для прямого ввода сообщения в ноде. `Process()` использует подключённый `message` или fallback на `messageText`. |
+| **`GraphRunner` — полностью переписан** | Новая модель: flow-based execution через `ExecuteFlow` → `EvaluateNode`. Поддерживает `VariableDeclaration`, `VariableSet`, `FlowIf` (ветвление `true`/`false`), `FlowFor` (init/condition/body/increment, до 10 000 итераций), `FlowWhile`, `Console.WriteLine` → вывод в консоль. Кнопка **Run** теперь синхронизирует граф и выполняет его. |
+| **`SyncFullGraphFromView`** | `float` → `InvariantCulture`; `ConsoleWriteLineNode.messageText` сохраняется; убрано дублирование логирования. |
+| **Тесты** | **42 теста** `dotnet test` — все зелёные (27 старых + 15 новых). Новые: переприсваивание переменных, `float` roundtrip, `if` с переменными в ветках, `if`/`else if`/`else` цепочка, `Console.WriteLine` с переменными, множественные `Console.WriteLine`, `for`/`while` дополнительные сценарии, структура парсера (exec flow edges, condition edge, if-else ladder, VariableSet, Console.WriteLine node). |
+
+### Изменённые файлы (Backend 2, доработка)
+
+```
+Editor/Windows/VisualScriptingWindow.cs    ← исправлена фильтрация рёбер, float-локаль, добавлены VariableSet/VariableDeclaration/FlowElse
+Editor/Nodes/Base/BaseExecutionNode.cs     ← уже наследует CustomBaseNode (верифицировано)
+Editor/Nodes/Flow/ElseNode.cs              ← воссоздан
+Editor/Nodes/Flow/ConsoleWriteLineNode.cs  ← добавлено поле messageText
+Editor/Nodes/Literals/FloatNode.cs         ← InvariantCulture
+Editor/Nodes/Variables/VariableDeclarationNode.cs ← воссоздан (execIn/execOut + output)
+Editor/Nodes/Variables/SetVariableNode.cs  ← воссоздан (execIn/execOut + value→output)
+Editor/Nodes/Variables/GetVariableNode.cs  ← воссоздан
+Runtime/Execution/GraphRunner.cs           ← полностью переписан (flow-based execution)
+VisualScripting.Tests/GeneratorTests.cs    ← 15 новых тестов
+```
+
+---
+
 ## Обновление от 05.04.2026 — Sprint 2 (Backend 2, Егор)
 
 | Область | Изменение |
 |--------|-----------|
-| **Визуальные ноды циклов** | Созданы `ForNode.cs` и `WhileNode.cs` (`Editor/Nodes/Flow/`) с портами по контракту: `execIn`, `init`, `condition`, `increment` → `body`, `execOut` (for); `execIn`, `condition` → `body`, `execOut` (while). |
-| **Нода `Console.WriteLine`** | Создана `ConsoleWriteLineNode.cs` (`Editor/Nodes/Flow/`) с портами `execIn`, `message` → `execOut`. В `Process()` вызывает `Debug.Log`. |
-| **Ноды преобразования типов** | Новая папка `Editor/Nodes/Conversion/`: `IntParseNode.cs` (`input` → `output`), `FloatParseNode.cs` (`input` → `output`), `ToStringNode.cs` (`input` → `output`). |
-| **Ноды `Mathf`** | Созданы `MathfAbsNode.cs` (`input` → `output`), `MathfMaxNode.cs` (`inputA`, `inputB` → `output`), `MathfMinNode.cs` (`inputA`, `inputB` → `output`) в `Editor/Nodes/Math/`. |
-| **`GraphSerializer`** | Реализована сериализация рёбер: `SerializeToGraphData` теперь конвертирует `graph.edges` → `EdgeData` (`FromNodeId`/`FromPort`/`ToNodeId`/`ToPort`). Реализована десериализация: `DeserializeToGraph` создаёт ноды из `NodeData` (полный маппинг `NodeType` → Editor-нода) и соединяет их через `graph.Connect`. |
-| **Генератор кода** | Верифицировано: `SimpleCodeGenerator` корректно обрабатывает `if`/`else if`/`else`, `for`, `while`, `Console.WriteLine`, `int.Parse`, `float.Parse`, `.ToString()`, `Mathf.Abs`/`Max`/`Min`, порты `execIn`/`execOut`, ветвления `true`/`false`, порты циклов `init`/`condition`/`increment`/`body`. |
-| **Тесты** | Все **27 тестов** `dotnet test` — зелёные. Покрыты: арифметика, %, сравнения, логика, if/else if/else, for + compound assignment, while + декремент, Console.WriteLine, int/float.Parse, ToString, +=, Mathf Abs/Max/Min, roundtrip. |
-
-### Новые файлы (Backend 2)
-
-```
-Editor/Nodes/Flow/ForNode.cs              ← нода цикла for
-Editor/Nodes/Flow/WhileNode.cs            ← нода цикла while
-Editor/Nodes/Flow/ConsoleWriteLineNode.cs ← нода Console.WriteLine
-Editor/Nodes/Conversion/IntParseNode.cs   ← нода int.Parse
-Editor/Nodes/Conversion/FloatParseNode.cs ← нода float.Parse
-Editor/Nodes/Conversion/ToStringNode.cs   ← нода ToString
-Editor/Nodes/Math/MathfAbsNode.cs         ← нода Mathf.Abs
-Editor/Nodes/Math/MathfMaxNode.cs         ← нода Mathf.Max
-Editor/Nodes/Math/MathfMinNode.cs         ← нода Mathf.Min
-```
-
-### Критерии готовности (статус)
-
-| № | Критерий | Статус |
-|---|----------|--------|
-| 1 | If/else генерируется корректно с правильными отступами | ✅ |
-| 2 | Ноды для циклов `for` и `while` созданы и работают | ✅ |
-| 3 | Генерация кода для циклов работает правильно | ✅ |
-| 4 | `Console.WriteLine` генерируется корректно | ✅ |
-| 5 | `int.Parse`, `float.Parse`, `ToString` генерируются корректно | ✅ |
-| 6 | Генератор учитывает порты потока выполнения (`execIn`/`execOut`) | ✅ |
-| 7 | Генератор корректно обрабатывает ветвления (`true`/`false`) | ✅ |
-| 8 | Генератор корректно обрабатывает циклы (`init`, `condition`, `increment`, `body`) | ✅ |
-| 9 | Нет ошибок компиляции | ✅ |
-| 10 | Генератор проходит тесты (27/27) | ✅ |
+| **Визуальные ноды циклов** | Созданы `ForNode.cs` и `WhileNode.cs` (`Editor/Nodes/Flow/`) с портами по контракту. |
+| **Нода `Console.WriteLine`** | Создана `ConsoleWriteLineNode.cs` с портами `execIn`, `message` → `execOut`. |
+| **Ноды преобразования типов** | `IntParseNode.cs`, `FloatParseNode.cs`, `ToStringNode.cs` в `Editor/Nodes/Conversion/`. |
+| **Ноды `Mathf`** | `MathfAbsNode.cs`, `MathfMaxNode.cs`, `MathfMinNode.cs` в `Editor/Nodes/Math/`. |
+| **`GraphSerializer`** | Сериализация/десериализация рёбер + фабрика нод. |
+| **Тесты** | 27 тестов — зелёные. |
 
 ---
 
