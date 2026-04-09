@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Globalization;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -19,10 +18,8 @@ using CustomVisualScripting.Editor.Nodes.Debug;
 using CustomVisualScripting.Editor.Nodes.Logic;
 using CustomVisualScripting.Editor.Nodes.Conversion;
 using CustomVisualScripting.Editor.Nodes.Unity;
-using CustomVisualScripting.Editor.Nodes.Variables;
 using CustomVisualScripting.Runtime.Execution;
 using VisualScripting.Core.Models;
-using VisualScripting.Core.Generators;
 using CustomToolbar = CustomVisualScripting.Windows.Views.ToolbarView;
 
 namespace CustomVisualScripting.Editor.Windows
@@ -180,29 +177,26 @@ namespace CustomVisualScripting.Editor.Windows
         
         private void OnRun()
         {
-            _toolbar.SetStatusWarning("Выполнение...");
+            if (_currentGraph?.LogicGraph == null || _currentGraph.LogicGraph.Nodes.Count == 0)
+            {
+                _toolbar.SetStatusError("Нет графа для выполнения");
+                return;
+            }
+            
             _toolbar.SetRunMode(true);
-
+            _toolbar.SetStatusWarning("Выполнение...");
+            
+            _runner = new GraphRunner();
+            
+            _runner.OnLogMessage += (message, type) => {
+                if (_consoleView != null)
+                {
+                    _consoleView.AddMessage(message, type);
+                }
+            };
+            
             try
             {
-                SyncFullGraphFromView();
-
-                var generator = new SimpleCodeGenerator();
-                string code = generator.Generate(_currentGraph.LogicGraph);
-
-                if (string.IsNullOrWhiteSpace(code) || code.StartsWith("//"))
-                {
-                    _toolbar.SetStatusError("Нет кода для выполнения");
-                    _toolbar.SetRunMode(false);
-                    return;
-                }
-
-                _runner = new GraphRunner();
-                _runner.OnLogMessage += (message, type) => {
-                    if (_consoleView != null)
-                        _consoleView.AddMessage(message, type);
-                };
-
                 _runner.Run(_currentGraph.LogicGraph);
                 _toolbar.SetStatusSuccess("Выполнение завершено");
             }
@@ -323,13 +317,11 @@ namespace CustomVisualScripting.Editor.Windows
                     if (customNode is IntNode intNode)
                         nodeData.Value = intNode.intValue.ToString();
                     else if (customNode is FloatNode floatNode)
-                        nodeData.Value = floatNode.floatValue.ToString(CultureInfo.InvariantCulture);
+                        nodeData.Value = floatNode.floatValue.ToString();
                     else if (customNode is BoolNode boolNode)
                         nodeData.Value = boolNode.boolValue.ToString();
                     else if (customNode is StringNode stringNode)
                         nodeData.Value = stringNode.stringValue;
-                    else if (customNode is ConsoleWriteLineNode cwlNode)
-                        nodeData.Value = cwlNode.messageText;
                     
                     _currentGraph.LogicGraph.Nodes.Add(nodeData);
                 }
@@ -349,19 +341,14 @@ namespace CustomVisualScripting.Editor.Windows
                 
                 if (fromNode == null || toNode == null) continue;
                 
-                var fromPortName = !string.IsNullOrEmpty(fromPort.portData.displayName)
-                    ? fromPort.portData.displayName
-                    : fromPort.fieldName;
-                var toPortName = !string.IsNullOrEmpty(toPort.portData.displayName)
-                    ? toPort.portData.displayName
-                    : toPort.fieldName;
+                Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
                 
                 _currentGraph.LogicGraph.Edges.Add(new EdgeData
                 {
                     FromNodeId = fromNode.NodeId,
-                    FromPort = fromPortName,
+                    FromPort = fromPort.fieldName,
                     ToNodeId = toNode.NodeId,
-                    ToPort = toPortName
+                    ToPort = toPort.fieldName
                 });
             }
             
@@ -411,15 +398,12 @@ namespace CustomVisualScripting.Editor.Windows
                             
                             if (node is IntNode intNode && int.TryParse(nodeData.Value, out int intVal))
                                 intNode.intValue = intVal;
-                            else if (node is FloatNode floatNode &&
-                                     float.TryParse(nodeData.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatVal))
+                            else if (node is FloatNode floatNode && float.TryParse(nodeData.Value, out float floatVal))
                                 floatNode.floatValue = floatVal;
                             else if (node is BoolNode boolNode && bool.TryParse(nodeData.Value, out bool boolVal))
                                 boolNode.boolValue = boolVal;
                             else if (node is StringNode stringNode)
                                 stringNode.stringValue = nodeData.Value;
-                            else if (node is ConsoleWriteLineNode cwlNode)
-                                cwlNode.messageText = nodeData.Value ?? "";
                             
                             _internalGraph.AddNode(node);
                             nodeMap[nodeData.Id] = node;
@@ -435,39 +419,48 @@ namespace CustomVisualScripting.Editor.Windows
                 {
                     foreach (var edgeData in _currentGraph.LogicGraph.Edges)
                     {
+                        if (edgeData.FromPort == "execOut" || edgeData.FromPort == "execIn" ||
+                            edgeData.ToPort == "execOut" || edgeData.ToPort == "execIn")
+                        {
+                            continue;
+                        }
+                        
                         if (!nodeMap.TryGetValue(edgeData.FromNodeId, out var fromNode)) continue;
                         if (!nodeMap.TryGetValue(edgeData.ToNodeId, out var toNode)) continue;
                         
                         if (!_graphView.nodeViewsPerNode.TryGetValue(fromNode, out var fromNodeView)) continue;
                         if (!_graphView.nodeViewsPerNode.TryGetValue(toNode, out var toNodeView)) continue;
                         
-                        var fromPort = FindOutputPort(fromNodeView, edgeData.FromPort);
-                        var toPort = FindInputPort(toNodeView, edgeData.ToPort);
+                        Debug.Log($"[VS] Восстанавливаем связь: {edgeData.FromNodeId}.{edgeData.FromPort} → {edgeData.ToNodeId}.{edgeData.ToPort}");
+                        
+                        var fromPort = fromNodeView.outputPortViews.FirstOrDefault(p => p.fieldName == edgeData.FromPort || p.portName == edgeData.FromPort);
+                        var toPort = toNodeView.inputPortViews.FirstOrDefault(p => p.fieldName == edgeData.ToPort || p.portName == edgeData.ToPort);
                         
                         if (fromPort == null)
                         {
-                            Debug.LogWarning($"[VS] Не найден выходной порт: '{edgeData.FromPort}' в ноде {fromNode.GetType().Name}. Доступные: {string.Join(", ", fromNodeView.outputPortViews.Select(p => $"{p.fieldName}({p.portData.displayName})"))}");
+                            Debug.LogWarning($"[VS] Не найден выходной порт: '{edgeData.FromPort}' в ноде {fromNode.GetType().Name}. Доступные: {string.Join(", ", fromNodeView.outputPortViews.Select(p => p.fieldName))}");
                             continue;
                         }
                         if (toPort == null)
                         {
-                            Debug.LogWarning($"[VS] Не найден входной порт: '{edgeData.ToPort}' в ноде {toNode.GetType().Name}. Доступные: {string.Join(", ", toNodeView.inputPortViews.Select(p => $"{p.fieldName}({p.portData.displayName})"))}");
+                            Debug.LogWarning($"[VS] Не найден входной порт: '{edgeData.ToPort}' в ноде {toNode.GetType().Name}. Доступные: {string.Join(", ", toNodeView.inputPortViews.Select(p => p.fieldName))}");
                             continue;
                         }
                         
-                        bool alreadyConnected = _graphView.edgeViews.Any(
-                            e => e.output == fromPort && e.input == toPort);
+                        bool alreadyConnected = false;
+                        foreach (var existingEdge in _graphView.edgeViews)
+                        {
+                            if (existingEdge.output == fromPort && existingEdge.input == toPort)
+                            {
+                                alreadyConnected = true;
+                                break;
+                            }
+                        }
                         
                         if (!alreadyConnected)
                         {
-                            try
-                            {
-                                _graphView.Connect(fromPort, toPort);
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.LogWarning($"[VS] Не удалось соединить {edgeData.FromPort} → {edgeData.ToPort}: {ex.Message}");
-                            }
+                            _graphView.Connect(fromPort, toPort);
+                            Debug.Log($"[VS] Связь создана: {edgeData.FromNodeId}.{edgeData.FromPort} → {edgeData.ToNodeId}.{edgeData.ToPort}");
                         }
                     }
                 }
@@ -500,18 +493,6 @@ namespace CustomVisualScripting.Editor.Windows
                 Debug.LogError($"[VS] Ошибка создания графа: {e.Message}\n{e.StackTrace}");
                 ShowTextualGraph();
             }
-        }
-
-        private static PortView FindOutputPort(BaseNodeView nodeView, string portName)
-        {
-            return nodeView.outputPortViews.FirstOrDefault(p => p.fieldName == portName)
-                ?? nodeView.outputPortViews.FirstOrDefault(p => p.portData.displayName == portName);
-        }
-
-        private static PortView FindInputPort(BaseNodeView nodeView, string portName)
-        {
-            return nodeView.inputPortViews.FirstOrDefault(p => p.fieldName == portName)
-                ?? nodeView.inputPortViews.FirstOrDefault(p => p.portData.displayName == portName);
         }
         
         private void ShowTextualGraph()
@@ -554,7 +535,6 @@ namespace CustomVisualScripting.Editor.Windows
                 case NodeType.LogicalOr: return new OrNode();
                 case NodeType.LogicalNot: return new NotNode();
                 case NodeType.FlowIf: return new IfNode();
-                case NodeType.FlowElse: return new ElseNode();
                 case NodeType.FlowFor: return new ForNode();
                 case NodeType.FlowWhile: return new WhileNode();
                 case NodeType.ConsoleWriteLine: return new ConsoleWriteLineNode();
@@ -568,9 +548,6 @@ namespace CustomVisualScripting.Editor.Windows
                 case NodeType.UnityVector3: return new Vector3CreateNode();
                 case NodeType.UnityGetPosition: return new GetPositionNode();
                 case NodeType.UnitySetPosition: return new SetPositionNode();
-                case NodeType.VariableSet: return new SetVariableNode();
-                case NodeType.VariableGet: return new GetVariableNode();
-                case NodeType.VariableDeclaration: return new VariableDeclarationNode();
                 default: return null;
             }
         }
