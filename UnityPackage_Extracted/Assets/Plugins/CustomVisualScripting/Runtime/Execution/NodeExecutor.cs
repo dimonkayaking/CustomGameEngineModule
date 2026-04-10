@@ -16,10 +16,10 @@ namespace CustomVisualScripting.Runtime.Execution
             {
                 return node.Type switch
                 {
-                    NodeType.LiteralInt => int.Parse(node.Value),
-                    NodeType.LiteralFloat => float.Parse(node.Value),
-                    NodeType.LiteralBool => bool.Parse(node.Value),
-                    NodeType.LiteralString => node.Value,
+                    NodeType.LiteralInt => ReadLiteralInt(node, inputs),
+                    NodeType.LiteralFloat => ReadLiteralFloat(node, inputs),
+                    NodeType.LiteralBool => ReadLiteralBool(node, inputs),
+                    NodeType.LiteralString => ReadLiteralString(node, inputs),
                     
                     NodeType.MathAdd => GetFloat(inputs, "inputA") + GetFloat(inputs, "inputB"),
                     NodeType.MathSubtract => GetFloat(inputs, "inputA") - GetFloat(inputs, "inputB"),
@@ -79,6 +79,64 @@ namespace CustomVisualScripting.Runtime.Execution
             var pos = GetVector3(inputs, "Position");
             if (go != null) go.transform.position = pos;
             return go;
+        }
+
+        private int ReadLiteralInt(NodeData node, Dictionary<string, object> inputs)
+        {
+            if (inputs.TryGetValue("inputValue", out var value))
+            {
+                return value switch
+                {
+                    int i => i,
+                    float f => (int)f,
+                    double d => (int)d,
+                    bool b => b ? 1 : 0,
+                    string s => int.TryParse(s, out var p) ? p : 0,
+                    _ => 0
+                };
+            }
+            return int.TryParse(node.Value, out var parsed) ? parsed : 0;
+        }
+
+        private float ReadLiteralFloat(NodeData node, Dictionary<string, object> inputs)
+        {
+            if (inputs.TryGetValue("inputValue", out var value))
+            {
+                return value switch
+                {
+                    int i => i,
+                    float f => f,
+                    double d => (float)d,
+                    bool b => b ? 1f : 0f,
+                    string s => float.TryParse(s, out var p) ? p : 0f,
+                    _ => 0f
+                };
+            }
+            return float.TryParse(node.Value, out var parsed) ? parsed : 0f;
+        }
+
+        private bool ReadLiteralBool(NodeData node, Dictionary<string, object> inputs)
+        {
+            if (inputs.TryGetValue("inputValue", out var value))
+            {
+                return value switch
+                {
+                    bool b => b,
+                    int i => i != 0,
+                    float f => f != 0f,
+                    double d => d != 0d,
+                    string s => bool.TryParse(s, out var p) && p,
+                    _ => false
+                };
+            }
+            return bool.TryParse(node.Value, out var parsed) && parsed;
+        }
+
+        private string ReadLiteralString(NodeData node, Dictionary<string, object> inputs)
+        {
+            if (inputs.TryGetValue("inputValue", out var value))
+                return value?.ToString() ?? "";
+            return node.Value ?? "";
         }
         
         private float GetFloat(Dictionary<string, object> inputs, string key)
