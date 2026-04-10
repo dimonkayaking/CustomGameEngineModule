@@ -239,7 +239,7 @@ namespace VisualScripting.Core.Parsers
                     continue;
                 }
 
-                var rootId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
+                var rootId = VisitExpression(v.Initializer.Value, false, null, out var unsupported);
                 if (unsupported)
                     continue;
 
@@ -248,8 +248,9 @@ namespace VisualScripting.Core.Parsers
 
                 var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
                 string litId;
-                if (rootNode != null && rootNode.VariableName == name)
+                if (rootNode != null && IsLiteralNodeType(rootNode.Type))
                 {
+                    rootNode.VariableName = name;
                     litId = rootId;
                 }
                 else
@@ -285,14 +286,15 @@ namespace VisualScripting.Core.Parsers
                 {
                     var idLeft = (IdentifierNameSyntax)assign.Left;
                     var name = idLeft.Identifier.Text;
-                    var rootId = VisitExpression(assign.Right, true, name, out var unsupported);
+                    var rootId = VisitExpression(assign.Right, false, null, out var unsupported);
                     if (unsupported || rootId == null)
                         return null;
 
                     var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
                     string litId;
-                    if (rootNode != null && rootNode.VariableName == name)
+                    if (rootNode != null && IsLiteralNodeType(rootNode.Type))
                     {
+                        rootNode.VariableName = name;
                         litId = rootId;
                     }
                     else
@@ -1056,6 +1058,9 @@ namespace VisualScripting.Core.Parsers
         private static bool IsMath(NodeType t) =>
             t is NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply
                 or NodeType.MathDivide or NodeType.MathModulo;
+
+        private static bool IsLiteralNodeType(NodeType t) =>
+            t is NodeType.LiteralBool or NodeType.LiteralInt or NodeType.LiteralFloat or NodeType.LiteralString;
 
         private string? VisitInvocationExpression(
             InvocationExpressionSyntax inv,

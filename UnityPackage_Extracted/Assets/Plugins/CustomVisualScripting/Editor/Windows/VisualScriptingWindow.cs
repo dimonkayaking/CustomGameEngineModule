@@ -301,40 +301,51 @@ namespace CustomVisualScripting.Editor.Windows
         
         private void SyncFullGraphFromView()
         {
-            if (_graphView == null) return;
+            if (_graphView == null || _internalGraph == null) return;
             
             _currentGraph.LogicGraph.Nodes.Clear();
             _currentGraph.LogicGraph.Edges.Clear();
-            
-            foreach (var nodeView in _graphView.nodeViews)
-            {
-                if (nodeView.nodeTarget is CustomBaseNode customNode)
-                {
-                    var nodeData = customNode.ToNodeData();
-                    nodeData.Id = customNode.NodeId;
-                    nodeData.VariableName = customNode.variableName;
-                    
-                    if (customNode is IntNode intNode)
-                        nodeData.Value = intNode.intValue.ToString();
-                    else if (customNode is FloatNode floatNode)
-                        nodeData.Value = floatNode.floatValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    else if (customNode is BoolNode boolNode)
-                        nodeData.Value = boolNode.boolValue.ToString();
-                    else if (customNode is StringNode stringNode)
-                        nodeData.Value = stringNode.stringValue;
 
-                    if (customNode is IfNode ifNode)
-                    {
-                        nodeData.ConditionSubGraph = ifNode.conditionSubGraph;
-                        nodeData.BodySubGraph = ifNode.bodySubGraph;
-                    }
-                    else if (customNode is ElseNode elseNode)
-                    {
-                        nodeData.BodySubGraph = elseNode.bodySubGraph;
-                    }
-                    
-                    _currentGraph.LogicGraph.Nodes.Add(nodeData);
+            var graphNodes = _internalGraph.nodes.OfType<CustomBaseNode>().ToList();
+            var validNodeIds = new HashSet<string>();
+
+            foreach (var customNode in graphNodes)
+            {
+                var nodeData = customNode.ToNodeData();
+                nodeData.Id = customNode.NodeId;
+                nodeData.VariableName = customNode.variableName;
+
+                if (customNode is IntNode intNode)
+                    nodeData.Value = intNode.intValue.ToString();
+                else if (customNode is FloatNode floatNode)
+                    nodeData.Value = floatNode.floatValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                else if (customNode is BoolNode boolNode)
+                    nodeData.Value = boolNode.boolValue.ToString();
+                else if (customNode is StringNode stringNode)
+                    nodeData.Value = stringNode.stringValue;
+
+                if (customNode is IfNode ifNode)
+                {
+                    nodeData.ConditionSubGraph = ifNode.conditionSubGraph;
+                    nodeData.BodySubGraph = ifNode.bodySubGraph;
                 }
+                else if (customNode is ElseNode elseNode)
+                {
+                    nodeData.BodySubGraph = elseNode.bodySubGraph;
+                }
+                else if (customNode is ForNode forNode)
+                {
+                    nodeData.ConditionSubGraph = forNode.conditionSubGraph;
+                    nodeData.BodySubGraph = forNode.bodySubGraph;
+                }
+                else if (customNode is WhileNode whileNode)
+                {
+                    nodeData.ConditionSubGraph = whileNode.conditionSubGraph;
+                    nodeData.BodySubGraph = whileNode.bodySubGraph;
+                }
+
+                _currentGraph.LogicGraph.Nodes.Add(nodeData);
+                validNodeIds.Add(customNode.NodeId);
             }
             
             foreach (var edgeView in _graphView.edgeViews)
@@ -350,6 +361,7 @@ namespace CustomVisualScripting.Editor.Windows
                 var toNode = toPort.owner.nodeTarget as CustomBaseNode;
                 
                 if (fromNode == null || toNode == null) continue;
+                if (!validNodeIds.Contains(fromNode.NodeId) || !validNodeIds.Contains(toNode.NodeId)) continue;
                 
                 Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
                 
@@ -368,22 +380,22 @@ namespace CustomVisualScripting.Editor.Windows
         
         private void SaveVisualNodePositions()
         {
-            if (_currentGraph?.VisualNodes == null || _graphView == null)
+            if (_currentGraph?.VisualNodes == null || _graphView == null || _internalGraph == null)
                 return;
             
             _currentGraph.VisualNodes.Clear();
-            
-            foreach (var nodeView in _graphView.nodeViews)
+
+            foreach (var customNode in _internalGraph.nodes.OfType<CustomBaseNode>())
             {
-                if (nodeView.nodeTarget is CustomBaseNode customNode)
+                if (!_graphView.nodeViewsPerNode.TryGetValue(customNode, out var nodeView))
+                    continue;
+
+                _currentGraph.VisualNodes.Add(new VisualNodeData
                 {
-                    _currentGraph.VisualNodes.Add(new VisualNodeData
-                    {
-                        NodeId = customNode.NodeId,
-                        Position = nodeView.GetPosition().position,
-                        IsCollapsed = false
-                    });
-                }
+                    NodeId = customNode.NodeId,
+                    Position = nodeView.GetPosition().position,
+                    IsCollapsed = false
+                });
             }
         }
         
@@ -423,6 +435,16 @@ namespace CustomVisualScripting.Editor.Windows
                             else if (node is ElseNode elseNode)
                             {
                                 elseNode.bodySubGraph = nodeData.BodySubGraph ?? new VisualScripting.Core.Models.GraphData();
+                            }
+                            else if (node is ForNode forNode)
+                            {
+                                forNode.conditionSubGraph = nodeData.ConditionSubGraph ?? new VisualScripting.Core.Models.GraphData();
+                                forNode.bodySubGraph = nodeData.BodySubGraph ?? new VisualScripting.Core.Models.GraphData();
+                            }
+                            else if (node is WhileNode whileNode)
+                            {
+                                whileNode.conditionSubGraph = nodeData.ConditionSubGraph ?? new VisualScripting.Core.Models.GraphData();
+                                whileNode.bodySubGraph = nodeData.BodySubGraph ?? new VisualScripting.Core.Models.GraphData();
                             }
                             
                             _internalGraph.AddNode(node);
