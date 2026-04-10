@@ -124,11 +124,11 @@ namespace CustomVisualScripting.Integration
                 case NodeType.LiteralFloat: return "Float";
                 case NodeType.LiteralString: return "String";
                 
-                case NodeType.MathAdd: return "Add";
-                case NodeType.MathSubtract: return "Subtract";
-                case NodeType.MathMultiply: return "Multiply";
-                case NodeType.MathDivide: return "Divide";
-                case NodeType.MathModulo: return "Modulo";
+                case NodeType.MathAdd: return "Add (+)";
+                case NodeType.MathSubtract: return "Subtract (-)";
+                case NodeType.MathMultiply: return "Multiply (*)";
+                case NodeType.MathDivide: return "Divide (/)";
+                case NodeType.MathModulo: return "Modulo (%)";
                 
                 case NodeType.CompareEqual: return "Equal";
                 case NodeType.CompareGreater: return "Greater";

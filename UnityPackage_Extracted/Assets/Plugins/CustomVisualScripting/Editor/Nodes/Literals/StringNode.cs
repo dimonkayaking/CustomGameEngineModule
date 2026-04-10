@@ -20,7 +20,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         [HideInInspector]
         public string stringValue = "";
 
-        public override string name => string.IsNullOrEmpty(variableName) ? $"String: \"{stringValue}\"" : $"{variableName} = \"{stringValue}\"";
+        public override string name => string.IsNullOrEmpty(variableName) ? $"String: \"{stringValue}\"" : $"string {variableName} = \"{stringValue}\"";
 
         protected override void Process()
         {

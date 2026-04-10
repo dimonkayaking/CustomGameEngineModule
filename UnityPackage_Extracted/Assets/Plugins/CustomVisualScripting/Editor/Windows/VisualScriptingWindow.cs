@@ -363,14 +363,14 @@ namespace CustomVisualScripting.Editor.Windows
                 if (fromNode == null || toNode == null) continue;
                 if (!validNodeIds.Contains(fromNode.NodeId) || !validNodeIds.Contains(toNode.NodeId)) continue;
                 
-                Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
+                Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.portName} → {toNode.NodeId}.{toPort.portName}");
                 
                 _currentGraph.LogicGraph.Edges.Add(new EdgeData
                 {
                     FromNodeId = fromNode.NodeId,
-                    FromPort = fromPort.fieldName,
+                    FromPort = fromPort.portName,
                     ToNodeId = toNode.NodeId,
-                    ToPort = toPort.fieldName
+                    ToPort = toPort.portName
                 });
             }
             

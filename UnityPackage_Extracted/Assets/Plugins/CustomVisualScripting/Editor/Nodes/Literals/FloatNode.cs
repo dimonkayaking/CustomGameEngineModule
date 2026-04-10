@@ -23,7 +23,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
 
         public override string name => string.IsNullOrEmpty(variableName)
             ? $"Float: {floatValue.ToString(CultureInfo.InvariantCulture)}"
-            : $"{variableName} = {floatValue.ToString(CultureInfo.InvariantCulture)}";
+            : $"float {variableName} = {floatValue.ToString(CultureInfo.InvariantCulture)}";
 
         protected override void Process()
         {

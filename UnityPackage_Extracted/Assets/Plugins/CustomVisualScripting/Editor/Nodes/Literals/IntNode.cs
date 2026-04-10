@@ -20,7 +20,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         [HideInInspector]
         public int intValue = 0;
 
-        public override string name => string.IsNullOrEmpty(variableName) ? $"Int: {intValue}" : $"{variableName} = {intValue}";
+        public override string name => string.IsNullOrEmpty(variableName) ? $"Int: {intValue}" : $"int {variableName} = {intValue}";
 
         protected override void Process()
         {
