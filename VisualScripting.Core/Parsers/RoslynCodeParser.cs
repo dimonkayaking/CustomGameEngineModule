@@ -239,29 +239,16 @@ namespace VisualScripting.Core.Parsers
                     continue;
                 }
 
-                var rootId = VisitExpression(v.Initializer.Value, false, null, out var unsupported);
+                var rootId = VisitExpression(v.Initializer.Value, true, name, out var unsupported);
                 if (unsupported)
                     continue;
 
                 if (rootId == null)
                     continue;
 
-                var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
-                string litId;
-                if (rootNode != null && IsLiteralNodeType(rootNode.Type))
-                {
-                    rootNode.VariableName = name;
-                    litId = rootId;
-                }
-                else
-                {
-                    litId = CreateDefaultLiteralNode(vType, name);
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), litId, "inputValue");
-                }
+                _symbolToNodeId[name] = rootId;
 
-                _symbolToNodeId[name] = litId;
-
-                var host = new FlowHost { NodeId = litId };
+                var host = new FlowHost { NodeId = rootId };
                 if (last != null)
                     AddEdge(last.NodeId, last.ExecOutPort, host.NodeId, "execIn");
                 else if (prevNode != null)
@@ -286,27 +273,13 @@ namespace VisualScripting.Core.Parsers
                 {
                     var idLeft = (IdentifierNameSyntax)assign.Left;
                     var name = idLeft.Identifier.Text;
-                    var rootId = VisitExpression(assign.Right, false, null, out var unsupported);
+                    var rootId = VisitExpression(assign.Right, true, name, out var unsupported);
                     if (unsupported || rootId == null)
                         return null;
 
-                    var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
-                    string litId;
-                    if (rootNode != null && IsLiteralNodeType(rootNode.Type))
-                    {
-                        rootNode.VariableName = name;
-                        litId = rootId;
-                    }
-                    else
-                    {
-                        var vType = _variableTypes.TryGetValue(name, out var t) ? t : "int";
-                        litId = CreateDefaultLiteralNode(vType, name);
-                        AddEdge(rootId, GetDataOutPortForNodeId(rootId), litId, "inputValue");
-                    }
+                    _symbolToNodeId[name] = rootId;
 
-                    _symbolToNodeId[name] = litId;
-
-                    var host = new FlowHost { NodeId = litId };
+                    var host = new FlowHost { NodeId = rootId };
                     if (prevNode != null)
                         AddEdge(prevNode, prevPort, host.NodeId, "execIn");
                     return host;
@@ -449,7 +422,7 @@ namespace VisualScripting.Core.Parsers
             {
                 Id = opId,
                 Type = opType.Value,
-                Value = "",
+                Value = OperatorSymbol(opType.Value),
                 ValueType = "",
                 VariableName = ""
             });
@@ -489,7 +462,7 @@ namespace VisualScripting.Core.Parsers
             {
                 Id = opId,
                 Type = opType,
-                Value = "",
+                Value = OperatorSymbol(opType),
                 ValueType = "",
                 VariableName = ""
             });
@@ -656,7 +629,7 @@ namespace VisualScripting.Core.Parsers
             {
                 Id = opId,
                 Type = opType,
-                Value = "",
+                Value = OperatorSymbol(opType),
                 ValueType = "",
                 VariableName = ""
             });
@@ -1045,7 +1018,7 @@ namespace VisualScripting.Core.Parsers
             {
                 Id = opId,
                 Type = opType.Value,
-                Value = "",
+                Value = OperatorSymbol(opType.Value),
                 ValueType = "",
                 VariableName = varName
             });
@@ -1061,6 +1034,16 @@ namespace VisualScripting.Core.Parsers
 
         private static bool IsLiteralNodeType(NodeType t) =>
             t is NodeType.LiteralBool or NodeType.LiteralInt or NodeType.LiteralFloat or NodeType.LiteralString;
+
+        private static string OperatorSymbol(NodeType t) => t switch
+        {
+            NodeType.MathAdd => "+",
+            NodeType.MathSubtract => "-",
+            NodeType.MathMultiply => "*",
+            NodeType.MathDivide => "/",
+            NodeType.MathModulo => "%",
+            _ => ""
+        };
 
         private string? VisitInvocationExpression(
             InvocationExpressionSyntax inv,

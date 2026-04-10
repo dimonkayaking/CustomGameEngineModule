@@ -30,6 +30,7 @@ namespace CustomVisualScripting.Editor.Nodes.Math
         public override NodeData ToNodeData()
         {
             var nodeData = base.ToNodeData();
+            nodeData.Value = "+";
             nodeData.ValueType = "float";
             return nodeData;
         }

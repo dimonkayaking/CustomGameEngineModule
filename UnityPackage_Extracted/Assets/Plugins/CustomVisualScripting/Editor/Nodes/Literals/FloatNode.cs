@@ -22,8 +22,8 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         public float floatValue = 0f;
 
         public override string name => string.IsNullOrEmpty(variableName)
-            ? $"Float: {floatValue.ToString(CultureInfo.InvariantCulture)}"
-            : $"{variableName} = {floatValue.ToString(CultureInfo.InvariantCulture)}";
+            ? $"float: {floatValue.ToString(CultureInfo.InvariantCulture)}"
+            : $"float {variableName} = {floatValue.ToString(CultureInfo.InvariantCulture)}";
 
         protected override void Process()
         {
