@@ -15,18 +15,21 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         public object inputValue;
 
         [Output("output")]
-        public string output;
+        public object output;
 
         [HideInInspector]
         public string stringValue = "";
 
-        public override string name => string.IsNullOrEmpty(variableName) ? $"String: \"{stringValue}\"" : $"String: {variableName} = \"{stringValue}\"";
+        [HideInInspector]
+        public string expressionOverride = "";
+
+        public override string name => string.IsNullOrEmpty(variableName) ? $"String: \"{stringValue}\"" : $"{variableName} = \"{stringValue}\"";
 
         protected override void Process()
         {
             if (inputValue != null)
             {
-                stringValue = inputValue.ToString();
+                stringValue = inputValue.ToString() ?? "";
             }
             output = stringValue;
         }
@@ -35,6 +38,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         {
             base.InitializeFromData(data);
             stringValue = data.Value ?? "";
+            expressionOverride = data.ExpressionOverride ?? "";
         }
 
         public override NodeData ToNodeData()
@@ -42,6 +46,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
             var data = base.ToNodeData();
             data.Value = stringValue;
             data.ValueType = "string";
+            data.ExpressionOverride = expressionOverride ?? "";
             return data;
         }
     }

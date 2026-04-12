@@ -46,22 +46,29 @@ namespace VisualScripting.Core.Generators
         {
             var sb = new StringBuilder();
             
-            // Находим все переменные (ноды с VariableName)
             var variables = _graph.Nodes.Where(n => !string.IsNullOrEmpty(n.VariableName)).OrderBy(n => n.Id).ToList();
             
             foreach (var node in variables)
             {
-                // Ищем, откуда приходит значение
-                var incomingEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputValue");
                 string valueExpr;
                 
-                if (incomingEdge != null && _map.TryGetValue(incomingEdge.FromNodeId, out var sourceNode))
+                // Если есть ExpressionOverride — используем его
+                if (!string.IsNullOrEmpty(node.ExpressionOverride))
                 {
-                    valueExpr = GetExpressionForNode(sourceNode);
+                    valueExpr = node.ExpressionOverride;
                 }
                 else
                 {
-                    valueExpr = GetDefaultValue(node.ValueType);
+                    var incomingEdge = _graph.Edges.FirstOrDefault(e => e.ToNodeId == node.Id && e.ToPort == "inputValue");
+                    
+                    if (incomingEdge != null && _map.TryGetValue(incomingEdge.FromNodeId, out var sourceNode))
+                    {
+                        valueExpr = GetExpressionForNode(sourceNode);
+                    }
+                    else
+                    {
+                        valueExpr = GetDefaultValue(node.ValueType);
+                    }
                 }
                 
                 string type = GetKeywordForType(node.ValueType);
@@ -119,13 +126,7 @@ namespace VisualScripting.Core.Generators
             if (string.IsNullOrEmpty(vn))
                 return;
 
-            if (IsLiteral(node.Type) && string.IsNullOrEmpty(node.Value)
-                && !_graph.Edges.Any(e => e.ToNodeId == node.Id && e.ToPort == "inputValue")
-                && _graph.Edges.Any(e => e.FromNodeId == node.Id))
-                return;
-
-            // ExpressionOverride takes priority: it stores the original source expression
-            // (e.g. "x + y") and is robust even when the inputValue edge is lost after round-trip.
+            // Если есть ExpressionOverride — используем его
             if (!string.IsNullOrEmpty(node.ExpressionOverride))
             {
                 if (_declared.Contains(vn))
@@ -135,6 +136,19 @@ namespace VisualScripting.Core.Generators
                     string type = GetKeywordForType(node.ValueType);
                     sb.AppendLine($"{pad}{type} {vn} = {node.ExpressionOverride};");
                     _declared.Add(vn);
+                }
+                return;
+            }
+
+            // Если есть литерал и нет входящей связи
+            if (IsLiteral(node.Type) && !_graph.Edges.Any(e => e.ToNodeId == node.Id && e.ToPort == "inputValue"))
+            {
+                if (_declared.Contains(vn))
+                    sb.AppendLine($"{pad}{vn} = {LiteralRhs(node)};");
+                else
+                {
+                    _declared.Add(vn);
+                    sb.AppendLine($"{pad}{KeywordFor(node.ValueType)} {vn} = {LiteralRhs(node)};");
                 }
                 return;
             }
@@ -247,39 +261,50 @@ namespace VisualScripting.Core.Generators
 
             sb.AppendLine($"{pad}}}");
 
-            var falseEdge = _graph.Edges.FirstOrDefault(
-                e => e.FromNodeId == ifNode.Id &&
-                     (e.FromPort == "false" || e.FromPort == "falseBranch"));
-            if (falseEdge == null || !_map.ContainsKey(falseEdge.ToNodeId))
-                return;
-
-            var target = _map[falseEdge.ToNodeId];
-
-            if (target.Type == NodeType.FlowIf)
+            // Ищем else ветку
+            NodeData? elseNode = null;
+            
+            var falseEdge = _graph.Edges.FirstOrDefault(e => e.FromNodeId == ifNode.Id && 
+                (e.FromPort == "false" || e.FromPort == "falseBranch"));
+            
+            if (falseEdge != null && _map.TryGetValue(falseEdge.ToNodeId, out var target))
             {
-                _emitted.Add(target.Id);
-                sb.Append($"{pad}else ");
-                EmitIf(target, sb, indent, inline: true);
+                elseNode = target;
             }
-            else if (target.Type == NodeType.FlowElse)
+            else
             {
-                _emitted.Add(target.Id);
-                sb.AppendLine($"{pad}else");
-                sb.AppendLine($"{pad}{{");
+                elseNode = _graph.Nodes.FirstOrDefault(n => n.Type == NodeType.FlowElse && 
+                    _graph.Edges.Any(e => e.FromNodeId == ifNode.Id && e.ToNodeId == n.Id));
+            }
 
-                if (target.BodySubGraph != null && target.BodySubGraph.Nodes.Count > 0)
+            if (elseNode != null)
+            {
+                if (elseNode.Type == NodeType.FlowIf)
                 {
-                    GenerateStatementsFromSubGraph(target.BodySubGraph, sb, indent + 1);
+                    _emitted.Add(elseNode.Id);
+                    sb.Append($"{pad}else ");
+                    EmitIf(elseNode, sb, indent, inline: true);
                 }
-                else
+                else if (elseNode.Type == NodeType.FlowElse)
                 {
-                    var bodyEdge = _graph.Edges.FirstOrDefault(
-                        e => e.FromNodeId == target.Id && e.FromPort == "execOut");
-                    if (bodyEdge != null)
-                        EmitChain(bodyEdge.ToNodeId, sb, indent + 1);
+                    _emitted.Add(elseNode.Id);
+                    sb.AppendLine($"{pad}else");
+                    sb.AppendLine($"{pad}{{");
+                    
+                    if (elseNode.BodySubGraph != null && elseNode.BodySubGraph.Nodes.Count > 0)
+                    {
+                        GenerateStatementsFromSubGraph(elseNode.BodySubGraph, sb, indent + 1);
+                    }
+                    else
+                    {
+                        var bodyEdge = _graph.Edges.FirstOrDefault(
+                            e => e.FromNodeId == elseNode.Id && e.FromPort == "execOut");
+                        if (bodyEdge != null)
+                            EmitChain(bodyEdge.ToNodeId, sb, indent + 1);
+                    }
+                    
+                    sb.AppendLine($"{pad}}}");
                 }
-
-                sb.AppendLine($"{pad}}}");
             }
         }
 

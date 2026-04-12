@@ -15,7 +15,7 @@ namespace CustomVisualScripting.Editor.Nodes.Conversion
         public object input;
 
         [Output("output")]
-        public string output;
+        public object output;
 
         public override string name => "ToString";
 

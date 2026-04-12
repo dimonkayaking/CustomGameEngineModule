@@ -11,16 +11,19 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
     {
         public override NodeType NodeType => NodeType.LiteralInt;
 
-        [Input("inputValue")]  // ← исправлено
+        [Input("inputValue")]
         public object inputValue;
 
         [Output("output")]
-        public int output;
+        public object output;
 
         [HideInInspector]
         public int intValue = 0;
 
-        public override string name => string.IsNullOrEmpty(variableName) ? $"Int: {intValue}" : $"Int: {variableName} = {intValue}";
+        [HideInInspector]
+        public string expressionOverride = "";
+
+        public override string name => string.IsNullOrEmpty(variableName) ? $"Int: {intValue}" : $"{variableName} = {intValue}";
 
         protected override void Process()
         {
@@ -31,6 +34,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
                     int i => i,
                     float f => Mathf.RoundToInt(f),
                     string s => int.TryParse(s, out int result) ? result : 0,
+                    bool b => b ? 1 : 0,
                     _ => 0
                 };
             }
@@ -44,6 +48,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
             {
                 intValue = parsed;
             }
+            expressionOverride = data.ExpressionOverride ?? "";
         }
 
         public override NodeData ToNodeData()
@@ -51,6 +56,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
             var data = base.ToNodeData();
             data.Value = intValue.ToString();
             data.ValueType = "int";
+            data.ExpressionOverride = expressionOverride ?? "";
             return data;
         }
     }

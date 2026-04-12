@@ -12,19 +12,34 @@ namespace CustomVisualScripting.Editor.Nodes.Math
         public override NodeType NodeType => NodeType.MathfMax;
 
         [Input("inputA")]
-        public float inputA;
+        public object inputA;
 
         [Input("inputB")]
-        public float inputB;
+        public object inputB;
 
         [Output("output")]
-        public float output;
+        public object output;
 
         public override string name => "Mathf.Max";
 
         protected override void Process()
         {
-            output = Mathf.Max(inputA, inputB);
+            float a = ConvertToFloat(inputA);
+            float b = ConvertToFloat(inputB);
+            output = Mathf.Max(a, b);
+        }
+
+        private float ConvertToFloat(object value)
+        {
+            return value switch
+            {
+                float f => f,
+                int i => i,
+                double d => (float)d,
+                string s => float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : 0f,
+                bool b => b ? 1f : 0f,
+                _ => 0f
+            };
         }
     }
 }

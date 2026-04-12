@@ -28,7 +28,19 @@ namespace CustomVisualScripting.Editor.Nodes
                 {
                     if (node is CustomBaseNode customNode)
                     {
-                        graphData.Nodes.Add(customNode.ToNodeData());
+                        var nodeData = customNode.ToNodeData();
+                        
+                        // Сохраняем ExpressionOverride для литералов
+                        if (customNode is IntNode intNode)
+                            nodeData.ExpressionOverride = intNode.expressionOverride;
+                        else if (customNode is FloatNode floatNode)
+                            nodeData.ExpressionOverride = floatNode.expressionOverride;
+                        else if (customNode is BoolNode boolNode)
+                            nodeData.ExpressionOverride = boolNode.expressionOverride;
+                        else if (customNode is StringNode stringNode)
+                            nodeData.ExpressionOverride = stringNode.expressionOverride;
+                        
+                        graphData.Nodes.Add(nodeData);
                     }
                 }
             }
@@ -148,7 +160,19 @@ namespace CustomVisualScripting.Editor.Nodes
             };
             
             if (node != null)
+            {
                 node.InitializeFromData(data);
+                
+                // Восстанавливаем ExpressionOverride для литералов
+                if (node is IntNode intNode)
+                    intNode.expressionOverride = data.ExpressionOverride;
+                else if (node is FloatNode floatNode)
+                    floatNode.expressionOverride = data.ExpressionOverride;
+                else if (node is BoolNode boolNode)
+                    boolNode.expressionOverride = data.ExpressionOverride;
+                else if (node is StringNode stringNode)
+                    stringNode.expressionOverride = data.ExpressionOverride;
+            }
             
             return node;
         }

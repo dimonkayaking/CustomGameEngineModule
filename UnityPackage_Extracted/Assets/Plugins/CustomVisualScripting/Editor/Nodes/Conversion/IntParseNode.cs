@@ -12,19 +12,17 @@ namespace CustomVisualScripting.Editor.Nodes.Conversion
         public override NodeType NodeType => NodeType.IntParse;
 
         [Input("input")]
-        public string input;
+        public object input;
 
         [Output("output")]
-        public int output;
+        public object output;
 
         public override string name => "int.Parse";
 
         protected override void Process()
         {
-            if (int.TryParse(input, out int result))
-                output = result;
-            else
-                output = 0;
+            string str = input?.ToString() ?? "";
+            output = int.TryParse(str, out int result) ? result : 0;
         }
 
         public override NodeData ToNodeData()

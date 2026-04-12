@@ -12,19 +12,43 @@ namespace CustomVisualScripting.Editor.Nodes.Math
         public override NodeType NodeType => NodeType.MathModulo;
 
         [Input("inputA")]
-        public float inputA;
+        public object inputA;
         
         [Input("inputB")]
-        public float inputB;
+        public object inputB;
         
         [Output("output")]
-        public float output;
+        public object output;
 
         public override string name => "Modulo (%)";
 
         protected override void Process()
         {
-            output = inputA % inputB;
+            float a = ConvertToFloat(inputA);
+            float b = ConvertToFloat(inputB);
+            
+            if (Mathf.Approximately(b, 0))
+            {
+                output = 0f;
+                UnityEngine.Debug.LogWarning("Модуль от нуля в ModuloNode");
+            }
+            else
+            {
+                output = a % b;
+            }
+        }
+
+        private float ConvertToFloat(object value)
+        {
+            return value switch
+            {
+                float f => f,
+                int i => i,
+                double d => (float)d,
+                string s => float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : 0f,
+                bool b => b ? 1f : 0f,
+                _ => 0f
+            };
         }
 
         public override NodeData ToNodeData()

@@ -12,27 +12,43 @@ namespace CustomVisualScripting.Editor.Nodes.Math
         public override NodeType NodeType => NodeType.MathDivide;
 
         [Input("inputA")]
-        public float inputA;
+        public object inputA;
         
         [Input("inputB")]
-        public float inputB;
+        public object inputB;
         
         [Output("output")]
-        public float output;
+        public object output;
 
         public override string name => "Divide (/)";
 
         protected override void Process()
         {
-            if (Mathf.Approximately(inputB, 0))
+            float a = ConvertToFloat(inputA);
+            float b = ConvertToFloat(inputB);
+            
+            if (Mathf.Approximately(b, 0))
             {
-                output = 0;
+                output = 0f;
                 UnityEngine.Debug.LogWarning("Деление на ноль в DivideNode");
             }
             else
             {
-                output = inputA / inputB;
+                output = a / b;
             }
+        }
+
+        private float ConvertToFloat(object value)
+        {
+            return value switch
+            {
+                float f => f,
+                int i => i,
+                double d => (float)d,
+                string s => float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : 0f,
+                bool b => b ? 1f : 0f,
+                _ => 0f
+            };
         }
 
         public override NodeData ToNodeData()

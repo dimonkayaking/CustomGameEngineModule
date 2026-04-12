@@ -12,19 +12,33 @@ namespace CustomVisualScripting.Editor.Nodes.Logic
         public override NodeType NodeType => NodeType.LogicalOr;
 
         [Input("left")]
-        public bool left;
+        public object left;
 
         [Input("right")]
-        public bool right;
+        public object right;
 
         [Output("result")]
-        public bool result;
+        public object result;
 
         public override string name => "OR (||)";
 
         protected override void Process()
         {
-            result = left || right;
+            bool leftVal = ConvertToBool(left);
+            bool rightVal = ConvertToBool(right);
+            result = leftVal || rightVal;
+        }
+
+        private bool ConvertToBool(object value)
+        {
+            return value switch
+            {
+                bool b => b,
+                int i => i != 0,
+                float f => f != 0,
+                string s => bool.TryParse(s, out bool result) ? result : false,
+                _ => false
+            };
         }
 
         public override NodeData ToNodeData()

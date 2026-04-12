@@ -11,7 +11,6 @@ namespace VisualScripting.Core.Parsers
 {
     public class RoslynCodeParser
     {
-        /// <summary>Обёртка: заглушка Mathf + метод; число '\n' до пользовательского кода = смещение строк в диагностиках.</summary>
         private static readonly string WrapPrefix =
             "static class Mathf\n{\n" +
             "    public static float Abs(float x) => x;\n" +
@@ -85,7 +84,6 @@ namespace VisualScripting.Core.Parsers
         private ParseResult Result() =>
             new ParseResult { Graph = _graph, Errors = _errors };
 
-        /// <summary>Строка:колонка относительно исходного кода пользователя (без служебной обёртки).</summary>
         private static string FormatUserLocation(SyntaxTree tree, TextSpan span)
         {
             var pos = tree.GetLineSpan(span);
@@ -244,11 +242,8 @@ namespace VisualScripting.Core.Parsers
                 }
 
                 var rootId = VisitExpression(v.Initializer.Value, false, null, out var unsupported);
-                if (unsupported)
-                    continue;
-
-                if (rootId == null)
-                    continue;
+                if (unsupported) continue;
+                if (rootId == null) continue;
 
                 var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
                 string litId;
@@ -304,11 +299,7 @@ namespace VisualScripting.Core.Parsers
 
                     var rootNode = _graph.Nodes.FirstOrDefault(n => n.Id == rootId);
                     string litId;
-                    // Only rename the RHS node when it is a fresh unnamed literal (e.g. the node
-                    // created for the literal 10 in "z = 10"). When the node already has a variable
-                    // name it is a variable-reference copy and must NOT be renamed.
-                    if (rootNode != null && IsLiteralNodeType(rootNode.Type)
-                        && string.IsNullOrEmpty(rootNode.VariableName))
+                    if (rootNode != null && IsLiteralNodeType(rootNode.Type) && string.IsNullOrEmpty(rootNode.VariableName))
                     {
                         rootNode.VariableName = name;
                         litId = rootId;
@@ -597,12 +588,6 @@ namespace VisualScripting.Core.Parsers
                 foreach (var v in forStmt.Declaration.Variables)
                 {
                     var name = v.Identifier.Text;
-                    if (_symbolToNodeId.ContainsKey(name))
-                    {
-                        _errors.Add(
-                            $"Повторное объявление переменной «{name}» ({FormatUserLocation(forStmt.SyntaxTree, v.Identifier.Span)}).");
-                        continue;
-                    }
 
                     if (v.Initializer == null)
                         continue;
@@ -1084,7 +1069,6 @@ namespace VisualScripting.Core.Parsers
             return opId;
         }
 
-        /// <summary>Constant-fold math trees at parse time (e.g. int z = x + y with x=10,y=20 → "30").</summary>
         private string TryEvaluateExpression(string nodeId)
         {
             var node = _graph.Nodes.FirstOrDefault(n => n.Id == nodeId);

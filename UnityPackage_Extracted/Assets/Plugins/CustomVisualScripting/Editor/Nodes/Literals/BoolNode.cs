@@ -15,12 +15,15 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
         public object inputValue;
 
         [Output("output")]
-        public bool output;
+        public object output;
 
         [HideInInspector]
         public bool boolValue = true;
 
-        public override string name => string.IsNullOrEmpty(variableName) ? $"Bool: {boolValue}" : $"Bool: {variableName} = {boolValue}";
+        [HideInInspector]
+        public string expressionOverride = "";
+
+        public override string name => string.IsNullOrEmpty(variableName) ? $"Bool: {boolValue}" : $"{variableName} = {boolValue}";
 
         protected override void Process()
         {
@@ -45,6 +48,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
             {
                 boolValue = parsed;
             }
+            expressionOverride = data.ExpressionOverride ?? "";
         }
 
         public override NodeData ToNodeData()
@@ -52,6 +56,7 @@ namespace CustomVisualScripting.Editor.Nodes.Literals
             var data = base.ToNodeData();
             data.Value = boolValue.ToString();
             data.ValueType = "bool";
+            data.ExpressionOverride = expressionOverride ?? "";
             return data;
         }
     }

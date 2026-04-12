@@ -18,13 +18,37 @@ namespace CustomVisualScripting.Editor.Nodes.Comparison
         public object right;
 
         [Output("result")]
-        public bool result;
+        public object result;
 
         public override string name => "Equal (==)";
         
         protected override void Process()
         {
-            result = left?.Equals(right) ?? (left == null && right == null);
+            if (left == null && right == null)
+                result = true;
+            else if (left == null || right == null)
+                result = false;
+            else
+            {
+                float? leftFloat = TryGetFloat(left);
+                float? rightFloat = TryGetFloat(right);
+                
+                if (leftFloat.HasValue && rightFloat.HasValue)
+                    result = Mathf.Approximately(leftFloat.Value, rightFloat.Value);
+                else
+                    result = left.Equals(right);
+            }
+        }
+
+        private float? TryGetFloat(object value)
+        {
+            return value switch
+            {
+                float f => f,
+                int i => i,
+                double d => (float)d,
+                _ => null
+            };
         }
 
         public override NodeData ToNodeData()

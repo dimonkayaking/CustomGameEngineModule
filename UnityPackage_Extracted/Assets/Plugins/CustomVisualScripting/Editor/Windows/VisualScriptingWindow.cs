@@ -300,83 +300,99 @@ namespace CustomVisualScripting.Editor.Windows
         }
         
         private void SyncFullGraphFromView()
+{
+    if (_graphView == null || _internalGraph == null) return;
+    
+    _currentGraph.LogicGraph.Nodes.Clear();
+    _currentGraph.LogicGraph.Edges.Clear();
+
+    var graphNodes = _internalGraph.nodes.OfType<CustomBaseNode>().ToList();
+    var validNodeIds = new HashSet<string>();
+
+    foreach (var customNode in graphNodes)
+    {
+        var nodeData = customNode.ToNodeData();
+        nodeData.Id = customNode.NodeId;
+        nodeData.VariableName = customNode.variableName;
+
+        if (customNode is IntNode intNode)
         {
-            if (_graphView == null || _internalGraph == null) return;
-            
-            _currentGraph.LogicGraph.Nodes.Clear();
-            _currentGraph.LogicGraph.Edges.Clear();
-
-            var graphNodes = _internalGraph.nodes.OfType<CustomBaseNode>().ToList();
-            var validNodeIds = new HashSet<string>();
-
-            foreach (var customNode in graphNodes)
-            {
-                var nodeData = customNode.ToNodeData();
-                nodeData.Id = customNode.NodeId;
-                nodeData.VariableName = customNode.variableName;
-
-                if (customNode is IntNode intNode)
-                    nodeData.Value = intNode.intValue.ToString();
-                else if (customNode is FloatNode floatNode)
-                    nodeData.Value = floatNode.floatValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                else if (customNode is BoolNode boolNode)
-                    nodeData.Value = boolNode.boolValue.ToString();
-                else if (customNode is StringNode stringNode)
-                    nodeData.Value = stringNode.stringValue;
-
-                if (customNode is IfNode ifNode)
-                {
-                    nodeData.ConditionSubGraph = ifNode.conditionSubGraph;
-                    nodeData.BodySubGraph = ifNode.bodySubGraph;
-                }
-                else if (customNode is ElseNode elseNode)
-                {
-                    nodeData.BodySubGraph = elseNode.bodySubGraph;
-                }
-                else if (customNode is ForNode forNode)
-                {
-                    nodeData.ConditionSubGraph = forNode.conditionSubGraph;
-                    nodeData.BodySubGraph = forNode.bodySubGraph;
-                }
-                else if (customNode is WhileNode whileNode)
-                {
-                    nodeData.ConditionSubGraph = whileNode.conditionSubGraph;
-                    nodeData.BodySubGraph = whileNode.bodySubGraph;
-                }
-
-                _currentGraph.LogicGraph.Nodes.Add(nodeData);
-                validNodeIds.Add(customNode.NodeId);
-            }
-            
-            foreach (var edgeView in _graphView.edgeViews)
-            {
-                if (edgeView == null) continue;
-                
-                var fromPort = edgeView.output as PortView;
-                var toPort = edgeView.input as PortView;
-                
-                if (fromPort == null || toPort == null) continue;
-                
-                var fromNode = fromPort.owner.nodeTarget as CustomBaseNode;
-                var toNode = toPort.owner.nodeTarget as CustomBaseNode;
-                
-                if (fromNode == null || toNode == null) continue;
-                if (!validNodeIds.Contains(fromNode.NodeId) || !validNodeIds.Contains(toNode.NodeId)) continue;
-                
-                Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
-                
-                _currentGraph.LogicGraph.Edges.Add(new EdgeData
-                {
-                    FromNodeId = fromNode.NodeId,
-                    FromPort = fromPort.fieldName,
-                    ToNodeId = toNode.NodeId,
-                    ToPort = toPort.fieldName
-                });
-            }
-            
-            SaveVisualNodePositions();
-            _hasUnsavedChanges = true;
+            nodeData.Value = intNode.intValue.ToString();
+            nodeData.ExpressionOverride = intNode.expressionOverride;
         }
+        else if (customNode is FloatNode floatNode)
+        {
+            nodeData.Value = floatNode.floatValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            nodeData.ExpressionOverride = floatNode.expressionOverride;
+        }
+        else if (customNode is BoolNode boolNode)
+        {
+            nodeData.Value = boolNode.boolValue.ToString();
+            nodeData.ExpressionOverride = boolNode.expressionOverride;
+        }
+        else if (customNode is StringNode stringNode)
+        {
+            nodeData.Value = stringNode.stringValue;
+            nodeData.ExpressionOverride = stringNode.expressionOverride;
+        }
+        else if (customNode is ConsoleWriteLineNode cwlNode)
+        {
+            nodeData.Value = cwlNode.messageText;
+        }
+
+        if (customNode is IfNode ifNode)
+        {
+            nodeData.ConditionSubGraph = ifNode.conditionSubGraph;
+            nodeData.BodySubGraph = ifNode.bodySubGraph;
+        }
+        else if (customNode is ElseNode elseNode)
+        {
+            nodeData.BodySubGraph = elseNode.bodySubGraph;
+        }
+        else if (customNode is ForNode forNode)
+        {
+            nodeData.ConditionSubGraph = forNode.conditionSubGraph;
+            nodeData.BodySubGraph = forNode.bodySubGraph;
+        }
+        else if (customNode is WhileNode whileNode)
+        {
+            nodeData.ConditionSubGraph = whileNode.conditionSubGraph;
+            nodeData.BodySubGraph = whileNode.bodySubGraph;
+        }
+
+        _currentGraph.LogicGraph.Nodes.Add(nodeData);
+        validNodeIds.Add(customNode.NodeId);
+    }
+    
+    foreach (var edgeView in _graphView.edgeViews)
+    {
+        if (edgeView == null) continue;
+        
+        var fromPort = edgeView.output as PortView;
+        var toPort = edgeView.input as PortView;
+        
+        if (fromPort == null || toPort == null) continue;
+        
+        var fromNode = fromPort.owner.nodeTarget as CustomBaseNode;
+        var toNode = toPort.owner.nodeTarget as CustomBaseNode;
+        
+        if (fromNode == null || toNode == null) continue;
+        if (!validNodeIds.Contains(fromNode.NodeId) || !validNodeIds.Contains(toNode.NodeId)) continue;
+        
+        Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
+        
+        _currentGraph.LogicGraph.Edges.Add(new EdgeData
+        {
+            FromNodeId = fromNode.NodeId,
+            FromPort = fromPort.fieldName,
+            ToNodeId = toNode.NodeId,
+            ToPort = toPort.fieldName
+        });
+    }
+    
+    SaveVisualNodePositions();
+    _hasUnsavedChanges = true;
+}
         
         private void SaveVisualNodePositions()
         {

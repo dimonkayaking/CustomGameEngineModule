@@ -185,8 +185,8 @@ namespace CustomVisualScripting.Editor.Nodes.Views
             if (_subGraph == null || _subGraph.Nodes.Count == 0)
             {
                 var emptyLabel = new Label(_isConditionPanel
-                    ? "\u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043D\u043E\u0434\u044B \u0443\u0441\u043B\u043E\u0432\u0438\u044F"
-                    : "\u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043D\u043E\u0434\u044B \u0442\u0435\u043B\u0430");
+                    ? "Добавьте ноды условия"
+                    : "Добавьте ноды тела");
                 emptyLabel.style.color = new Color(0.5f, 0.5f, 0.5f);
                 emptyLabel.style.fontSize = 10;
                 emptyLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -492,6 +492,8 @@ namespace CustomVisualScripting.Editor.Nodes.Views
                 "bool" => new Color(0.9f, 0.3f, 0.3f),
                 "string" => new Color(0.9f, 0.7f, 0.2f),
                 "exec" => new Color(0.9f, 0.9f, 0.9f),
+                "GameObject" => new Color(0.4f, 0.8f, 0.4f),
+                "Vector3" => new Color(0.2f, 0.7f, 0.9f),
                 _ => new Color(0.6f, 0.6f, 0.6f)
             };
         }
@@ -532,12 +534,30 @@ namespace CustomVisualScripting.Editor.Nodes.Views
                 if (_portElements.TryGetValue(_connectingFromNodeId, out var ports) &&
                     ports.TryGetValue(key, out var el))
                 {
-                    el.style.backgroundColor = new Color(1f, 0.7f, 0.3f);
+                    el.style.backgroundColor = GetTypeColor(GetPortType(_connectingFromPort));
                 }
             }
 
             _connectingFromNodeId = null;
             _connectingFromPort = null;
+        }
+
+        private string GetPortType(string portName)
+        {
+            return portName switch
+            {
+                "execIn" or "execOut" => "exec",
+                "inputValue" => "value",
+                "output" => "value",
+                "inputA" or "inputB" => "float",
+                "left" or "right" => "float",
+                "input" => "float",
+                "result" => "bool",
+                "message" => "string",
+                "GameObject" => "GameObject",
+                "Position" or "Vector3" => "Vector3",
+                _ => ""
+            };
         }
 
         private void AddConnection(string fromId, string fromPort, string toId, string toPort)
@@ -606,7 +626,7 @@ namespace CustomVisualScripting.Editor.Nodes.Views
             line.style.backgroundColor = new Color(0.6f, 0.6f, 0.6f);
             line.style.left = from.x;
             line.style.top = from.y - 1;
-            line.transform.rotation = Quaternion.Euler(0, 0, angle);
+            line.style.rotate = new Rotate(angle);
             line.style.transformOrigin = new TransformOrigin(0, Length.Percent(50));
             line.pickingMode = PickingMode.Ignore;
 
@@ -685,7 +705,6 @@ namespace CustomVisualScripting.Editor.Nodes.Views
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Flow/Console.WriteLine"), false,
                     () => AddNode(NodeType.ConsoleWriteLine));
-                menu.AddItem(new GUIContent("Flow/Debug.Log"), false, () => AddNode(NodeType.DebugLog));
             }
 
             menu.ShowAsContext();
@@ -694,14 +713,21 @@ namespace CustomVisualScripting.Editor.Nodes.Views
         private void AddNode(NodeType type)
         {
             var id = $"sub_{Guid.NewGuid().ToString("N").Substring(0, 8)}";
-            _subGraph.Nodes.Add(new NodeData
+            var nodeData = new NodeData
             {
                 Id = id,
                 Type = type,
                 Value = GetDefaultValue(type),
                 ValueType = GetDefaultValueType(type),
                 VariableName = ""
-            });
+            };
+
+            if (IsLiteral(type))
+            {
+                nodeData.ExpressionOverride = GetDefaultValue(type);
+            }
+
+            _subGraph.Nodes.Add(nodeData);
 
             Rebuild();
             OnChanged?.Invoke();
@@ -732,18 +758,18 @@ namespace CustomVisualScripting.Editor.Nodes.Views
         private static string GetNodeTypeLabel(NodeType type) => type switch
         {
             NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply
-                or NodeType.MathDivide or NodeType.MathModulo => "float/int \u2192 float/int",
+                or NodeType.MathDivide or NodeType.MathModulo => "float/int → float/int",
             NodeType.CompareEqual or NodeType.CompareNotEqual or NodeType.CompareGreater
                 or NodeType.CompareLess or NodeType.CompareGreaterOrEqual
-                or NodeType.CompareLessOrEqual => "any \u2192 bool",
-            NodeType.LogicalAnd or NodeType.LogicalOr => "bool \u2192 bool",
-            NodeType.LogicalNot => "bool \u2192 bool",
-            NodeType.ConsoleWriteLine or NodeType.DebugLog => "exec + string",
-            NodeType.IntParse => "string \u2192 int",
-            NodeType.FloatParse => "string \u2192 float",
-            NodeType.ToStringConvert => "any \u2192 string",
-            NodeType.MathfAbs => "float \u2192 float",
-            NodeType.MathfMax or NodeType.MathfMin => "float, float \u2192 float",
+                or NodeType.CompareLessOrEqual => "any → bool",
+            NodeType.LogicalAnd or NodeType.LogicalOr => "bool → bool",
+            NodeType.LogicalNot => "bool → bool",
+            NodeType.ConsoleWriteLine => "exec + string",
+            NodeType.IntParse => "string → int",
+            NodeType.FloatParse => "string → float",
+            NodeType.ToStringConvert => "any → string",
+            NodeType.MathfAbs => "float → float",
+            NodeType.MathfMax or NodeType.MathfMin => "float, float → float",
             _ => ""
         };
 
@@ -788,28 +814,30 @@ namespace CustomVisualScripting.Editor.Nodes.Views
             NodeType.LiteralFloat => new() { new() { name = "inputValue", displayName = "value", typeName = "float" } },
             NodeType.LiteralBool => new() { new() { name = "inputValue", displayName = "value", typeName = "bool" } },
             NodeType.LiteralString => new() { new() { name = "inputValue", displayName = "value", typeName = "string" } },
-            NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply or NodeType.MathDivide
-                or NodeType.MathModulo
+            
+            NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply or NodeType.MathDivide or NodeType.MathModulo
                 => new() { new() { name = "inputA", displayName = "A", typeName = "float" }, new() { name = "inputB", displayName = "B", typeName = "float" } },
+            
             NodeType.CompareEqual or NodeType.CompareNotEqual or NodeType.CompareGreater or NodeType.CompareLess
                 or NodeType.CompareGreaterOrEqual or NodeType.CompareLessOrEqual
                 => new() { new() { name = "left", displayName = "left", typeName = "float" }, new() { name = "right", displayName = "right", typeName = "float" } },
+            
             NodeType.LogicalAnd or NodeType.LogicalOr
                 => new() { new() { name = "left", displayName = "left", typeName = "bool" }, new() { name = "right", displayName = "right", typeName = "bool" } },
             NodeType.LogicalNot
                 => new() { new() { name = "input", displayName = "input", typeName = "bool" } },
-            NodeType.ConsoleWriteLine or NodeType.DebugLog
-                => new()
-                {
-                    new() { name = "execIn", displayName = "exec", typeName = "exec" },
-                    new() { name = "message", displayName = "message", typeName = "string" }
-                },
+            
+            NodeType.ConsoleWriteLine
+                => new() { new() { name = "execIn", displayName = "exec", typeName = "exec" }, new() { name = "message", displayName = "message", typeName = "string" } },
+            
             NodeType.IntParse => new() { new() { name = "input", displayName = "input", typeName = "string" } },
             NodeType.FloatParse => new() { new() { name = "input", displayName = "input", typeName = "string" } },
             NodeType.ToStringConvert => new() { new() { name = "input", displayName = "input", typeName = "" } },
+            
             NodeType.MathfAbs => new() { new() { name = "input", displayName = "input", typeName = "float" } },
             NodeType.MathfMax or NodeType.MathfMin
                 => new() { new() { name = "inputA", displayName = "A", typeName = "float" }, new() { name = "inputB", displayName = "B", typeName = "float" } },
+            
             _ => new()
         };
 
@@ -819,22 +847,28 @@ namespace CustomVisualScripting.Editor.Nodes.Views
             NodeType.LiteralFloat => new() { new() { name = "output", displayName = "output", typeName = "float" } },
             NodeType.LiteralBool => new() { new() { name = "output", displayName = "output", typeName = "bool" } },
             NodeType.LiteralString => new() { new() { name = "output", displayName = "output", typeName = "string" } },
-            NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply or NodeType.MathDivide
-                or NodeType.MathModulo
+            
+            NodeType.MathAdd or NodeType.MathSubtract or NodeType.MathMultiply or NodeType.MathDivide or NodeType.MathModulo
                 => new() { new() { name = "output", displayName = "output", typeName = "float" } },
+            
             NodeType.CompareEqual or NodeType.CompareNotEqual or NodeType.CompareGreater or NodeType.CompareLess
                 or NodeType.CompareGreaterOrEqual or NodeType.CompareLessOrEqual
                 => new() { new() { name = "result", displayName = "result", typeName = "bool" } },
+            
             NodeType.LogicalAnd or NodeType.LogicalOr or NodeType.LogicalNot
                 => new() { new() { name = "result", displayName = "result", typeName = "bool" } },
-            NodeType.ConsoleWriteLine or NodeType.DebugLog
+            
+            NodeType.ConsoleWriteLine
                 => new() { new() { name = "execOut", displayName = "exec", typeName = "exec" } },
+            
             NodeType.IntParse => new() { new() { name = "output", displayName = "output", typeName = "int" } },
             NodeType.FloatParse => new() { new() { name = "output", displayName = "output", typeName = "float" } },
             NodeType.ToStringConvert => new() { new() { name = "output", displayName = "output", typeName = "string" } },
+            
             NodeType.MathfAbs => new() { new() { name = "output", displayName = "output", typeName = "float" } },
             NodeType.MathfMax or NodeType.MathfMin
                 => new() { new() { name = "output", displayName = "output", typeName = "float" } },
+            
             _ => new()
         };
     }

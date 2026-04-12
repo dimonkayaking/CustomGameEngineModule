@@ -12,16 +12,29 @@ namespace CustomVisualScripting.Editor.Nodes.Logic
         public override NodeType NodeType => NodeType.LogicalNot;
 
         [Input("input")]
-        public bool input;
+        public object input;
 
         [Output("result")]
-        public bool result;
+        public object result;
 
         public override string name => "NOT (!)";
 
         protected override void Process()
         {
-            result = !input;
+            bool inputVal = ConvertToBool(input);
+            result = !inputVal;
+        }
+
+        private bool ConvertToBool(object value)
+        {
+            return value switch
+            {
+                bool b => b,
+                int i => i != 0,
+                float f => f != 0,
+                string s => bool.TryParse(s, out bool result) ? result : false,
+                _ => false
+            };
         }
 
         public override NodeData ToNodeData()
