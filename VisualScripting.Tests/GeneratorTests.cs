@@ -517,6 +517,82 @@ else
     }
 
     [Fact]
+    public void IfElseIfElse_LegacyExecOutInsteadOfFalseBranch_StillEmitsElseIfChain()
+    {
+        var code = @"
+int number = 10;
+if (number > 0)
+{
+    Console.WriteLine(""Число положительное"");
+}
+else if (number < 0)
+{
+    Console.WriteLine(""Число отрицательное"");
+}
+else
+{
+    Console.WriteLine(""Число равно нулю"");
+}";
+
+        var result = _parser.Parse(code);
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors));
+
+        var ifNodes = result.Graph.Nodes.Where(n => n.Type == NodeType.FlowIf).ToList();
+        Assert.Equal(2, ifNodes.Count);
+        var firstIfId = ifNodes[0].Id;
+        var secondIfId = ifNodes[1].Id;
+
+        var falseEdge = result.Graph.Edges.FirstOrDefault(
+            e => e.FromNodeId == firstIfId && e.ToNodeId == secondIfId && e.FromPort == "falseBranch");
+        Assert.NotNull(falseEdge);
+        falseEdge!.FromPort = "execOut";
+        falseEdge.ToPort = "execIn";
+
+        var output = _generator.Generate(result.Graph).Replace("\r", "");
+        Assert.Contains("else if (number < 0)", output);
+        Assert.DoesNotContain("}\nif (number < 0)", output);
+    }
+
+    [Fact]
+    public void Roundtrip_IfElseIfElse_AndTernaryDeclarations_PreservesStructureAndTypes()
+    {
+        var code = @"
+int a = 15;
+int b = 7;
+int result = 0;
+
+if (a > b)
+{
+    result = a - b;
+}
+else if (a < b)
+{
+    result = b - a;
+}
+else
+{
+    result = a + b;
+}
+
+int max = (a > b) ? a : b;
+int absolute = (result < 0) ? -result : result;";
+
+        var output = Roundtrip(code).Replace("\r", "");
+        Assert.Contains("if (a > b)", output);
+        Assert.Contains("else if (a < b)", output);
+        Assert.Contains("else", output);
+        Assert.DoesNotContain("}\nif (a < b)", output);
+
+        Assert.Contains("int max = (a > b) ? a : b;", output);
+        Assert.Contains("int absolute = (result < 0) ? -result : result;", output);
+
+        Assert.DoesNotContain("a = ;", output);
+        Assert.DoesNotContain("b = ;", output);
+        Assert.DoesNotContain("string max =", output);
+        Assert.DoesNotContain("string absolute =", output);
+    }
+
+    [Fact]
     public void ConsoleWriteLineWithVariable()
     {
         var code = @"

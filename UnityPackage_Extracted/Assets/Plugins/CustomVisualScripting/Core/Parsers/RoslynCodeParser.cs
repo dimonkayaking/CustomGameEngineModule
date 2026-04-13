@@ -256,6 +256,7 @@ namespace VisualScripting.Core.Parsers
                 if (rootNode != null && IsLiteralNodeType(rootNode.Type))
                 {
                     rootNode.VariableName = name;
+                    rootNode.ValueType = vType;
                     litId = rootId;
                 }
                 else
@@ -308,6 +309,8 @@ namespace VisualScripting.Core.Parsers
                     if (rootNode != null && IsLiteralNodeType(rootNode.Type) && string.IsNullOrEmpty(rootNode.VariableName))
                     {
                         rootNode.VariableName = name;
+                        if (_variableTypes.TryGetValue(name, out var existingType))
+                            rootNode.ValueType = existingType;
                         litId = rootId;
                     }
                     else
@@ -1131,12 +1134,16 @@ namespace VisualScripting.Core.Parsers
         private string CreateStringExpressionLiteralNode(string expressionText, string variableName)
         {
             var id = NewId();
+            var valueType = "string";
+            if (!string.IsNullOrEmpty(variableName) && _variableTypes.TryGetValue(variableName, out var declaredType))
+                valueType = declaredType;
+
             _graph.Nodes.Add(new NodeData
             {
                 Id = id,
                 Type = NodeType.LiteralString,
                 Value = "",
-                ValueType = "string",
+                ValueType = valueType,
                 VariableName = variableName ?? "",
                 ExpressionOverride = expressionText
             });

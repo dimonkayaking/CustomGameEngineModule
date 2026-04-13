@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GraphProcessor;
@@ -381,12 +382,13 @@ namespace CustomVisualScripting.Editor.Windows
         
         Debug.Log($"[VS] Сохраняем связь: {fromNode.NodeId}.{fromPort.fieldName} → {toNode.NodeId}.{toPort.fieldName}");
         
+        var canonicalToPort = CanonicalPortIdForStorage(toPort);
         _currentGraph.LogicGraph.Edges.Add(new EdgeData
         {
             FromNodeId = fromNode.NodeId,
-            FromPort = CanonicalPortIdForStorage(fromPort),
+            FromPort = CanonicalFromPortIdForStorage(fromPort, fromNode, toNode, canonicalToPort),
             ToNodeId = toNode.NodeId,
-            ToPort = CanonicalPortIdForStorage(toPort)
+            ToPort = canonicalToPort
         });
     }
     
@@ -487,8 +489,17 @@ namespace CustomVisualScripting.Editor.Windows
                         
                         Debug.Log($"[VS] Восстанавливаем связь: {edgeData.FromNodeId}.{edgeData.FromPort} → {edgeData.ToNodeId}.{edgeData.ToPort}");
                         
-                        var fromPort = fromNodeView.outputPortViews.FirstOrDefault(p => p.fieldName == edgeData.FromPort || p.portName == edgeData.FromPort);
-                        var toPort = toNodeView.inputPortViews.FirstOrDefault(p => p.fieldName == edgeData.ToPort || p.portName == edgeData.ToPort);
+                        var fromPort = fromNodeView.outputPortViews.FirstOrDefault(p => IsPortMatchForStorage(p, edgeData.FromPort));
+                        var toPort = toNodeView.inputPortViews.FirstOrDefault(p => IsPortMatchForStorage(p, edgeData.ToPort));
+
+                        if (fromPort == null && fromNode is IfNode &&
+                            (string.Equals(NormalizePortId(edgeData.FromPort), "execOut", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(NormalizePortId(edgeData.FromPort), "falseBranch", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            fromPort = fromNodeView.outputPortViews.FirstOrDefault(p =>
+                                string.Equals(NormalizePortId(p.fieldName), "falseBranch", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(NormalizePortId(p.portName), "falseBranch", StringComparison.OrdinalIgnoreCase));
+                        }
                         
                         if (fromPort == null)
                         {
@@ -605,6 +616,43 @@ namespace CustomVisualScripting.Editor.Windows
                 case NodeType.UnitySetPosition: return new SetPositionNode();
                 default: return null;
             }
+        }
+
+        /// <summary>
+        /// Единые имена портов в LogicGraph (GraphProcessor может отличаться регистром fieldName / portName).
+        /// </summary>
+        private static string CanonicalFromPortIdForStorage(PortView port, CustomBaseNode fromNode, CustomBaseNode toNode, string canonicalToPort)
+        {
+            var id = CanonicalPortIdForStorage(port);
+
+            // If-node fallback output should map to false branch only when the link clearly
+            // points into branch-control flow (If/Else exec input), not for arbitrary exec edges.
+            if (fromNode is IfNode &&
+                (toNode is IfNode || toNode is ElseNode) &&
+                string.Equals(canonicalToPort, "execIn", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(id, "execOut", StringComparison.OrdinalIgnoreCase))
+                return "falseBranch";
+
+            return id;
+        }
+
+        private static bool IsPortMatchForStorage(PortView port, string savedPortId)
+        {
+            if (port == null || string.IsNullOrWhiteSpace(savedPortId))
+                return false;
+
+            var expected = NormalizePortId(savedPortId);
+            if (string.IsNullOrEmpty(expected))
+                return false;
+
+            var field = NormalizePortId(port.fieldName);
+            if (!string.IsNullOrEmpty(field) &&
+                string.Equals(field, expected, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            var name = NormalizePortId(port.portName);
+            return !string.IsNullOrEmpty(name) &&
+                   string.Equals(name, expected, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

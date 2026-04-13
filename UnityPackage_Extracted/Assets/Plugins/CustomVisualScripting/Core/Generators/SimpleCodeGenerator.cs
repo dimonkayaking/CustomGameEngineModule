@@ -52,6 +52,9 @@ namespace VisualScripting.Core.Generators
             
             foreach (var node in variables)
             {
+                if (IsPlaceholderVariableRefLiteral(node))
+                    continue;
+
                 string valueExpr;
                 
                 // Если есть ExpressionOverride — используем его
@@ -126,6 +129,8 @@ namespace VisualScripting.Core.Generators
         {
             var vn = node.VariableName;
             if (string.IsNullOrEmpty(vn))
+                return;
+            if (IsPlaceholderVariableRefLiteral(node))
                 return;
 
             // Если есть ExpressionOverride — используем его
@@ -721,13 +726,13 @@ namespace VisualScripting.Core.Generators
             t is NodeType.IntParse or NodeType.FloatParse or NodeType.ToStringConvert
                 or NodeType.MathfAbs or NodeType.MathfMax or NodeType.MathfMin;
 
-        private static bool IsStatementEntryNode(NodeData n)
+        private bool IsStatementEntryNode(NodeData n)
         {
             if (n.Type is NodeType.FlowIf or NodeType.FlowElse or NodeType.FlowFor or NodeType.FlowWhile
                 or NodeType.ConsoleWriteLine)
                 return true;
 
-            if (IsLiteral(n.Type) && !string.IsNullOrEmpty(n.VariableName))
+            if (IsLiteral(n.Type) && !string.IsNullOrEmpty(n.VariableName) && !IsPlaceholderVariableRefLiteral(n))
                 return true;
 
             if ((IsBinaryOp(n.Type) || n.Type == NodeType.LogicalNot || IsBuiltinExpressionNode(n.Type)) &&
@@ -735,6 +740,22 @@ namespace VisualScripting.Core.Generators
                 return true;
 
             return false;
+        }
+
+        private bool IsPlaceholderVariableRefLiteral(NodeData node)
+        {
+            if (!IsLiteral(node.Type) || string.IsNullOrEmpty(node.VariableName))
+                return false;
+            if (!string.IsNullOrEmpty(node.ExpressionOverride))
+                return false;
+            if (!string.IsNullOrEmpty(node.Value))
+                return false;
+
+            // Subgraph variable refs are expression helpers and must not be emitted as statements.
+            var hasInputValue = _graph.Edges.Any(e =>
+                e.ToNodeId == node.Id &&
+                string.Equals(e.ToPort, "inputValue", StringComparison.OrdinalIgnoreCase));
+            return !hasInputValue;
         }
 
         /// <summary>
@@ -778,7 +799,22 @@ namespace VisualScripting.Core.Generators
                 (targetNode.Type == NodeType.FlowIf || targetNode.Type == NodeType.FlowElse));
 
             if (explicitFalse == null)
-                return false;
+            {
+                // Compatibility fallback: some persisted editor graphs can lose falseBranch
+                // and keep only execOut for If -> (If|Else). Treat it as a false branch only
+                // when target is a flow branch node.
+                var legacyExecOut = _graph.Edges.FirstOrDefault(e =>
+                    e.FromNodeId == ifId &&
+                    IsExecOutPort(e.FromPort) &&
+                    _map.TryGetValue(e.ToNodeId, out var targetNode) &&
+                    (targetNode.Type == NodeType.FlowIf || targetNode.Type == NodeType.FlowElse));
+
+                if (legacyExecOut == null)
+                    return false;
+
+                successor = _map[legacyExecOut.ToNodeId];
+                return true;
+            }
 
             successor = _map[explicitFalse.ToNodeId];
             return true;
