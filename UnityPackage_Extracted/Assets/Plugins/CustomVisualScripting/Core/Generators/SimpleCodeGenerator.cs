@@ -513,8 +513,23 @@ namespace VisualScripting.Core.Generators
                 e => e.ToNodeId == node.Id && e.ToPort == "message");
             var msg = msgEdge != null
                 ? EmitCondExpr(msgEdge.FromNodeId)
-                : $"\"{(node.Value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+                : FormatConsoleLiteral(node);
             sb.AppendLine($"{pad}Console.WriteLine({msg});");
+        }
+
+        private static string FormatConsoleLiteral(NodeData node)
+        {
+            var valueType = (node.ValueType ?? "").Trim().ToLowerInvariant();
+            var raw = node.Value ?? "";
+            return valueType switch
+            {
+                "int" => int.TryParse(raw, out var i) ? i.ToString() : "0",
+                "float" => float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f)
+                    ? $"{f.ToString(System.Globalization.CultureInfo.InvariantCulture)}f"
+                    : "0f",
+                "bool" => bool.TryParse(raw, out var b) ? b.ToString().ToLowerInvariant() : "false",
+                _ => $"\"{raw.Replace("\\", "\\\\").Replace("\"", "\\\"")}\""
+            };
         }
 
         private string EmitExpr(string nodeId) => EmitCore(nodeId, true, null);

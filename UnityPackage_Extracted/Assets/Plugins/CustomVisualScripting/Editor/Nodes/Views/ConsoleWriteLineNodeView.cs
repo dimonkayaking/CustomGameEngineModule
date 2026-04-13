@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine.UIElements;
 using GraphProcessor;
 using CustomVisualScripting.Editor.Nodes.Base;
@@ -11,9 +13,13 @@ namespace CustomVisualScripting.Editor.Nodes.Views
     [NodeCustomEditor(typeof(ConsoleWriteLineNode))]
     public class ConsoleWriteLineNodeView : BaseNodeView
     {
+        private static readonly List<string> LiteralTypes = new() { "string", "int", "float", "bool" };
+
         private ConsoleWriteLineNode _node;
+        private PopupField<string> _typeField;
         private TextField _messageField;
         private Label _inputInfoLabel;
+        private Label _validationLabel;
 
         public override void Enable()
         {
@@ -29,10 +35,23 @@ namespace CustomVisualScripting.Editor.Nodes.Views
                 mainContainer.Add(controlsContainer);
             }
 
-            _messageField = new TextField("Message Text");
+            _typeField = new PopupField<string>("Type", LiteralTypes, _node.messageValueType ?? "string");
+            _typeField.RegisterValueChangedCallback(evt =>
+            {
+                _node.messageValueType = ConsoleWriteLineNode.NormalizeType(evt.newValue);
+                ValidateAndPersist(_messageField.value ?? "");
+            });
+            controlsContainer.Add(_typeField);
+
+            _messageField = new TextField("Value");
             _messageField.value = _node.messageText ?? "";
-            _messageField.RegisterValueChangedCallback(evt => { _node.messageText = evt.newValue ?? ""; });
+            _messageField.RegisterValueChangedCallback(evt => { ValidateAndPersist(evt.newValue ?? ""); });
             controlsContainer.Add(_messageField);
+
+            _validationLabel = new Label();
+            _validationLabel.style.display = DisplayStyle.None;
+            _validationLabel.style.color = new UnityEngine.Color(1f, 0.55f, 0.55f);
+            controlsContainer.Add(_validationLabel);
 
             _inputInfoLabel = new Label();
             _inputInfoLabel.style.display = DisplayStyle.None;
@@ -60,6 +79,7 @@ namespace CustomVisualScripting.Editor.Nodes.Views
         {
             var hasInput = TryGetConnectedMessageExpression(out var inputExpression);
 
+            _typeField.SetEnabled(!hasInput);
             _messageField.SetEnabled(!hasInput);
             if (!hasInput)
             {
@@ -69,11 +89,67 @@ namespace CustomVisualScripting.Editor.Nodes.Views
                     _messageField.SetValueWithoutNotify(expectedValue);
                 }
                 _inputInfoLabel.style.display = DisplayStyle.None;
+                _validationLabel.style.display = DisplayStyle.None;
                 return;
             }
 
             _inputInfoLabel.text = $"Input: {inputExpression}";
             _inputInfoLabel.style.display = DisplayStyle.Flex;
+            _validationLabel.style.display = DisplayStyle.None;
+        }
+
+        private void ValidateAndPersist(string rawValue)
+        {
+            var normalizedType = ConsoleWriteLineNode.NormalizeType(_typeField.value);
+            _node.messageValueType = normalizedType;
+
+            if (TryNormalizeValue(normalizedType, rawValue, out var normalized, out var error))
+            {
+                _node.messageText = normalized;
+                _messageField.SetValueWithoutNotify(normalized);
+                _validationLabel.style.display = DisplayStyle.None;
+                return;
+            }
+
+            _validationLabel.text = error;
+            _validationLabel.style.display = DisplayStyle.Flex;
+        }
+
+        private static bool TryNormalizeValue(string type, string rawValue, out string normalized, out string error)
+        {
+            normalized = rawValue;
+            error = "";
+            var input = (rawValue ?? "").Trim();
+            switch (type)
+            {
+                case "int":
+                    if (!int.TryParse(input, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+                    {
+                        error = "Expected int value.";
+                        return false;
+                    }
+                    normalized = i.ToString(CultureInfo.InvariantCulture);
+                    return true;
+                case "float":
+                    if (!float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var f))
+                    {
+                        error = "Expected float value.";
+                        return false;
+                    }
+                    normalized = f.ToString(CultureInfo.InvariantCulture);
+                    return true;
+                case "bool":
+                    if (!bool.TryParse(input, out var b))
+                    {
+                        error = "Expected bool value: true/false.";
+                        return false;
+                    }
+                    normalized = b ? "true" : "false";
+                    return true;
+                default:
+                    normalized = rawValue ?? "";
+                    return true;
+            }
         }
 
         private bool TryGetConnectedMessageExpression(out string expression)

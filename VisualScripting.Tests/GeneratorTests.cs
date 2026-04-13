@@ -611,11 +611,28 @@ Console.WriteLine(message);";
         {
             Id = "print_1",
             Type = NodeType.ConsoleWriteLine,
-            Value = "Direct literal from node"
+            Value = "Direct literal from node",
+            ValueType = "string"
         });
 
         var output = _generator.Generate(graph);
         Assert.Contains("Console.WriteLine(\"Direct literal from node\");", output);
+    }
+
+    [Fact]
+    public void ConsoleWriteLineWithoutMessageEdgeUsesTypedLiteral()
+    {
+        var graph = new GraphData();
+        graph.Nodes.Add(new NodeData
+        {
+            Id = "print_int",
+            Type = NodeType.ConsoleWriteLine,
+            Value = "40",
+            ValueType = "int"
+        });
+
+        var output = _generator.Generate(graph);
+        Assert.Contains("Console.WriteLine(40);", output);
     }
 
     [Fact]
@@ -789,8 +806,26 @@ else
 
         var cwlNode = result.Graph.Nodes.FirstOrDefault(n => n.Type == NodeType.ConsoleWriteLine);
         Assert.NotNull(cwlNode);
+        Assert.Equal("string", cwlNode.ValueType);
+        Assert.Equal("Test", cwlNode.Value);
 
         var msgEdge = result.Graph.Edges.FirstOrDefault(e => e.ToNodeId == cwlNode.Id && e.ToPort == "message");
+        Assert.Null(msgEdge);
+    }
+
+    [Fact]
+    public void ConsoleWriteLineVariableKeepsMessageEdge()
+    {
+        var code = @"
+string message = ""Hi"";
+Console.WriteLine(message);";
+        var result = _parser.Parse(code);
+        Assert.False(result.HasErrors, string.Join("\n", result.Errors));
+
+        var cwlNode = result.Graph.Nodes.FirstOrDefault(n => n.Type == NodeType.ConsoleWriteLine);
+        Assert.NotNull(cwlNode);
+
+        var msgEdge = result.Graph.Edges.FirstOrDefault(e => e.ToNodeId == cwlNode!.Id && e.ToPort == "message");
         Assert.NotNull(msgEdge);
     }
 }

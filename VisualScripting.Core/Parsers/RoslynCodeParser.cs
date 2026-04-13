@@ -374,33 +374,81 @@ namespace VisualScripting.Core.Parsers
 
         private FlowHost? VisitConsoleWriteLine(InvocationExpressionSyntax inv, string? prevNode, string prevPort)
         {
-            string? msgId;
-            if (inv.ArgumentList.Arguments.Count == 0)
-            {
-                msgId = CreateLiteralStringNode("");
-            }
-            else
-            {
-                msgId = VisitExpression(inv.ArgumentList.Arguments[0].Expression, false, null, out var u);
-                if (u || msgId == null)
-                    return null;
-            }
-
             var nodeId = NewId();
-            _graph.Nodes.Add(new NodeData
+            var nodeData = new NodeData
             {
                 Id = nodeId,
                 Type = NodeType.ConsoleWriteLine,
                 Value = "",
-                ValueType = "",
+                ValueType = "string",
                 VariableName = ""
-            });
-            AddEdge(msgId, GetDataOutPortForNodeId(msgId), nodeId, "message");
+            };
+
+            if (inv.ArgumentList.Arguments.Count > 0)
+            {
+                var arg = inv.ArgumentList.Arguments[0].Expression;
+                if (TryParseConsoleLiteral(arg, out var literalValue, out var literalType))
+                {
+                    nodeData.Value = literalValue;
+                    nodeData.ValueType = literalType;
+                }
+                else
+                {
+                    var msgId = VisitExpression(arg, false, null, out var u);
+                    if (u || msgId == null)
+                        return null;
+                    _graph.Nodes.Add(nodeData);
+                    AddEdge(msgId, GetDataOutPortForNodeId(msgId), nodeId, "message");
+                    if (prevNode != null)
+                        AddEdge(prevNode, prevPort, nodeId, "execIn");
+                    return new FlowHost { NodeId = nodeId };
+                }
+            }
+
+            _graph.Nodes.Add(nodeData);
 
             if (prevNode != null)
                 AddEdge(prevNode, prevPort, nodeId, "execIn");
 
             return new FlowHost { NodeId = nodeId };
+        }
+
+        private static bool TryParseConsoleLiteral(ExpressionSyntax expression, out string value, out string valueType)
+        {
+            value = "";
+            valueType = "string";
+            expression = expression is ParenthesizedExpressionSyntax p ? p.Expression : expression;
+
+            if (expression is LiteralExpressionSyntax lit)
+            {
+                switch (lit.Kind())
+                {
+                    case SyntaxKind.StringLiteralExpression:
+                        value = lit.Token.ValueText ?? "";
+                        valueType = "string";
+                        return true;
+                    case SyntaxKind.NumericLiteralExpression:
+                        var text = lit.Token.Text;
+                        if (text.Contains('.') || text.EndsWith("f", StringComparison.OrdinalIgnoreCase))
+                        {
+                            value = text.TrimEnd('f', 'F');
+                            valueType = "float";
+                        }
+                        else
+                        {
+                            value = text;
+                            valueType = "int";
+                        }
+                        return true;
+                    case SyntaxKind.TrueLiteralExpression:
+                    case SyntaxKind.FalseLiteralExpression:
+                        value = (lit.Token.ValueText ?? lit.Token.Text).ToLowerInvariant();
+                        valueType = "bool";
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private string CreateLiteralStringNode(string text)

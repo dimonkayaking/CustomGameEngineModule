@@ -371,6 +371,7 @@ namespace CustomVisualScripting.Editor.Windows
                 else if (customNode is ConsoleWriteLineNode cwlNode)
                 {
                     nodeData.Value = cwlNode.messageText;
+                    nodeData.ValueType = cwlNode.messageValueType;
                 }
 
                 if (customNode is IfNode ifNode)
