@@ -10,6 +10,7 @@ export type LessonItem = {
   duration: string;
   format: 'theory' | 'practice';
   theory: string[];
+  videoUrl?: string;
   task?: string;
   successHint?: string;
 };
@@ -36,6 +37,7 @@ export const courseModules: ModuleItem[] = [
         summary: 'Скачивание Unity Hub, выбор актуальной LTS или Unity 6 и создание первого 2D/3D проекта.',
         duration: '12 мин',
         format: 'theory',
+        videoUrl: 'https://youtu.be/Qo93Jtso0k8',
         theory: [
           'Разбираем, зачем нужен Unity Hub и как через него управлять версиями редактора и проектами.',
           'Показываем, как выбрать стабильную версию движка для обучения: LTS или Unity 6.',

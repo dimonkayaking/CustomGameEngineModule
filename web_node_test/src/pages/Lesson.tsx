@@ -4,6 +4,21 @@ import { useAppContext } from '../context/AppContext';
 import { allLessonIds, courseModules, getLessonById } from '../data/courseData';
 import './Lesson.css';
 
+const getEmbedUrl = (url?: string) => {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    const videoId = parsed.hostname.includes('youtu.be')
+      ? parsed.pathname.slice(1)
+      : parsed.searchParams.get('v');
+
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  } catch {
+    return null;
+  }
+};
+
 const Lesson: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,6 +39,7 @@ const Lesson: React.FC = () => {
   const currentIndex = allLessonIds.indexOf(lesson.id);
   const nextLessonId = currentIndex >= 0 && currentIndex < allLessonIds.length - 1 ? allLessonIds[currentIndex + 1] : null;
   const isTheoryOnlyLesson = lesson.format === 'theory' && !lesson.task;
+  const embedUrl = getEmbedUrl(lesson.videoUrl);
 
   const relatedPractice = useMemo(() => module.practice, [module]);
 
@@ -81,7 +97,17 @@ const Lesson: React.FC = () => {
           </div>
 
           <div className="lesson-video">
-            <div className="video-player">
+            <div className={`video-player ${embedUrl ? 'video-player--embedded' : ''}`}>
+              {embedUrl && (
+                <iframe
+                  className="video-embed"
+                  src={embedUrl}
+                  title={lesson.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              )}
               <div className="video-placeholder">
                 <div className="play-button">▶</div>
                 <p>Здесь будет встроенное видео урока из Rutube</p>
