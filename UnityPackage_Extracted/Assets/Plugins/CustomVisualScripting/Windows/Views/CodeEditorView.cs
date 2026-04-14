@@ -29,7 +29,7 @@ namespace CustomVisualScripting.Windows.Views
             _textField = new TextField
             {
                 multiline = true,
-                value = "// Введите код здесь\n\npublic class MyClass\n{\n    public void MyMethod()\n    {\n        int x = 10;\n        int y = 20;\n        int z = x + y;\n    }\n}"
+                value = ""
             };
             _textField.style.flexGrow = 1;
             _textField.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f);

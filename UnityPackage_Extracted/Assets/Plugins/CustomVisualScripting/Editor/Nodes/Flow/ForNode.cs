@@ -15,6 +15,12 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
         public GraphData conditionSubGraph = new GraphData();
 
         [HideInInspector]
+        public GraphData initSubGraph = new GraphData();
+
+        [HideInInspector]
+        public GraphData incrementSubGraph = new GraphData();
+
+        [HideInInspector]
         public GraphData bodySubGraph = new GraphData();
 
         public override string name => "For Loop";
@@ -23,6 +29,8 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
         {
             var data = base.ToNodeData();
             data.ConditionSubGraph = conditionSubGraph;
+            data.InitSubGraph = initSubGraph;
+            data.IncrementSubGraph = incrementSubGraph;
             data.BodySubGraph = bodySubGraph;
             return data;
         }
@@ -31,6 +39,8 @@ namespace CustomVisualScripting.Editor.Nodes.Flow
         {
             base.InitializeFromData(data);
             conditionSubGraph = data.ConditionSubGraph ?? new GraphData();
+            initSubGraph = data.InitSubGraph ?? new GraphData();
+            incrementSubGraph = data.IncrementSubGraph ?? new GraphData();
             bodySubGraph = data.BodySubGraph ?? new GraphData();
         }
     }

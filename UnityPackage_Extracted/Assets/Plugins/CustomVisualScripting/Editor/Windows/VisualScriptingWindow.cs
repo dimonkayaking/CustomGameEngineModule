@@ -383,11 +383,13 @@ namespace CustomVisualScripting.Editor.Windows
                 {
                     nodeData.BodySubGraph = elseNode.bodySubGraph;
                 }
-                else if (customNode is ForNode forNode)
-                {
-                    nodeData.ConditionSubGraph = forNode.conditionSubGraph;
-                    nodeData.BodySubGraph = forNode.bodySubGraph;
-                }
+        else if (customNode is ForNode forNode)
+        {
+            nodeData.InitSubGraph = forNode.initSubGraph;
+            nodeData.ConditionSubGraph = forNode.conditionSubGraph;
+            nodeData.IncrementSubGraph = forNode.incrementSubGraph;
+            nodeData.BodySubGraph = forNode.bodySubGraph;
+        }
                 else if (customNode is WhileNode whileNode)
                 {
                     nodeData.ConditionSubGraph = whileNode.conditionSubGraph;
@@ -496,7 +498,9 @@ namespace CustomVisualScripting.Editor.Windows
                             }
                             else if (node is ForNode forNode)
                             {
+                                forNode.initSubGraph = nodeData.InitSubGraph ?? new VisualScripting.Core.Models.GraphData();
                                 forNode.conditionSubGraph = nodeData.ConditionSubGraph ?? new VisualScripting.Core.Models.GraphData();
+                                forNode.incrementSubGraph = nodeData.IncrementSubGraph ?? new VisualScripting.Core.Models.GraphData();
                                 forNode.bodySubGraph = nodeData.BodySubGraph ?? new VisualScripting.Core.Models.GraphData();
                             }
                             else if (node is WhileNode whileNode)

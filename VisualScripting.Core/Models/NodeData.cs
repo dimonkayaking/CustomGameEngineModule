@@ -14,6 +14,8 @@ namespace VisualScripting.Core.Models
 
         public GraphData? ConditionSubGraph { get; set; }
         public GraphData? BodySubGraph { get; set; }
+        public GraphData? InitSubGraph { get; set; }
+        public GraphData? IncrementSubGraph { get; set; }
 
         /// <summary>
         /// Stores the original source expression text (e.g. "x + y") for robust code generation

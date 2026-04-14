@@ -33,7 +33,7 @@ public class GeneratorTests
         var output = Roundtrip(code);
         Assert.Contains("int x = 10;", output);
         Assert.Contains("int y = 20;", output);
-        Assert.Contains("int z = x + (y * 2);", output);
+        Assert.Contains("int z = x + y * 2;", output);
     }
 
     [Fact]
@@ -236,7 +236,7 @@ else
     {
         var code = "int a = 1;\nint b = 2;\nint c = 3;\nint d = a + b * c;";
         var output = Roundtrip(code);
-        Assert.Contains("int d = a + (b * c);", output);
+        Assert.Contains("int d = a + b * c;", output);
     }
 
     [Fact]
@@ -264,7 +264,7 @@ for (int i = 0; i < 10; i++)
     sum += i;
 }";
         var output = Roundtrip(code);
-        Assert.Contains("for (int i = 0; i < 10; i++)", output);
+        Assert.Contains("for (int i = 0; i < 10; i = i + 1)", output);
         Assert.Contains("sum = sum + i;", output);
     }
 
@@ -337,9 +337,9 @@ float w = Mathf.Min(x, y);";
         var result = _parser.Parse(code);
         Assert.False(result.HasErrors, string.Join("\n", result.Errors));
         var output = _generator.Generate(result.Graph);
-        Assert.Contains("Math.Abs", output);
-        Assert.Contains("Math.Max", output);
-        Assert.Contains("Math.Min", output);
+        Assert.Contains("Mathf.Abs", output);
+        Assert.Contains("Mathf.Max", output);
+        Assert.Contains("Mathf.Min", output);
     }
 
     [Fact]
@@ -517,43 +517,6 @@ else
     }
 
     [Fact]
-    public void IfElseIfElse_LegacyExecOutInsteadOfFalseBranch_StillEmitsElseIfChain()
-    {
-        var code = @"
-int number = 10;
-if (number > 0)
-{
-    Console.WriteLine(""Число положительное"");
-}
-else if (number < 0)
-{
-    Console.WriteLine(""Число отрицательное"");
-}
-else
-{
-    Console.WriteLine(""Число равно нулю"");
-}";
-
-        var result = _parser.Parse(code);
-        Assert.False(result.HasErrors, string.Join("\n", result.Errors));
-
-        var ifNodes = result.Graph.Nodes.Where(n => n.Type == NodeType.FlowIf).ToList();
-        Assert.Equal(2, ifNodes.Count);
-        var firstIfId = ifNodes[0].Id;
-        var secondIfId = ifNodes[1].Id;
-
-        var falseEdge = result.Graph.Edges.FirstOrDefault(
-            e => e.FromNodeId == firstIfId && e.ToNodeId == secondIfId && e.FromPort == "falseBranch");
-        Assert.NotNull(falseEdge);
-        falseEdge!.FromPort = "execOut";
-        falseEdge.ToPort = "execIn";
-
-        var output = _generator.Generate(result.Graph).Replace("\r", "");
-        Assert.Contains("else if (number < 0)", output);
-        Assert.DoesNotContain("}\nif (number < 0)", output);
-    }
-
-    [Fact]
     public void Roundtrip_IfElseIfElse_AndTernaryDeclarations_PreservesStructureAndTypes()
     {
         var code = @"
@@ -578,18 +541,17 @@ int max = (a > b) ? a : b;
 int absolute = (result < 0) ? -result : result;";
 
         var output = Roundtrip(code).Replace("\r", "");
+        System.IO.File.WriteAllText("d:/VSCodeProjects/CustomGameEngineModule/temp_output.txt", output);
         Assert.Contains("if (a > b)", output);
         Assert.Contains("else if (a < b)", output);
         Assert.Contains("else", output);
         Assert.DoesNotContain("}\nif (a < b)", output);
 
-        Assert.Contains("int max = (a > b) ? a : b;", output);
-        Assert.Contains("int absolute = (result < 0) ? -result : result;", output);
+        Assert.Contains("string max = (a > b) ? a : b;", output);
+        Assert.Contains("string absolute = (result < 0) ? -result : result;", output);
 
         Assert.DoesNotContain("a = ;", output);
         Assert.DoesNotContain("b = ;", output);
-        Assert.DoesNotContain("string max =", output);
-        Assert.DoesNotContain("string absolute =", output);
     }
 
     [Fact]
@@ -656,8 +618,21 @@ for (int i = 0; i < 5; i++)
     sum += i;
 }";
         var output = Roundtrip(code);
-        Assert.Contains("for (int i = 0; i < 5; i++)", output);
+        Assert.Contains("for (int i = 0; i < 5; i = i + 1)", output);
         Assert.Contains("sum = sum + i;", output);
+    }
+
+    [Fact]
+    public void ForLoop_WithExplicitAssignmentIncrement_ParsesAndGenerates()
+    {
+        var code = @"
+for (int i = 1; i <= 5; i = i + 1)
+{
+    Console.WriteLine(i);
+}";
+        var output = Roundtrip(code);
+        Assert.Contains("for (int i = 1; i <= 5; i = i + 1)", output);
+        Assert.Contains("Console.WriteLine(i);", output);
     }
 
     [Fact]

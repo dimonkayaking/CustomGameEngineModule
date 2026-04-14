@@ -420,7 +420,7 @@ namespace VisualScripting.Core.Generators
         private void EmitFor(NodeData forNode, StringBuilder sb, int indent)
         {
             var pad = Pad(indent);
-            var initStr = EmitForInitClause(forNode.Id);
+            var initStr = EmitForInitClause(forNode);
             var condStr = "";
             if (forNode.ConditionSubGraph != null && forNode.ConditionSubGraph.Nodes.Count > 0)
             {
@@ -432,7 +432,7 @@ namespace VisualScripting.Core.Generators
                     e => e.ToNodeId == forNode.Id && e.ToPort == "condition");
                 condStr = condEdge != null ? EmitCondExpr(condEdge.FromNodeId) : "";
             }
-            var incStr = EmitForIncrementClause(forNode.Id);
+            var incStr = EmitForIncrementClause(forNode);
             sb.AppendLine($"{pad}for ({initStr}; {condStr}; {incStr})");
             sb.AppendLine($"{pad}{{");
             if (forNode.BodySubGraph != null && forNode.BodySubGraph.Nodes.Count > 0)
@@ -449,10 +449,21 @@ namespace VisualScripting.Core.Generators
             sb.AppendLine($"{pad}}}");
         }
 
-        private string EmitForInitClause(string forId)
+        private string GenerateForClauseFromSubGraph(GraphData subGraph)
         {
+            if (subGraph == null || subGraph.Nodes.Count == 0) return "";
+            var sb = new StringBuilder();
+            GenerateStatementsFromSubGraph(subGraph, sb, 0);
+            return sb.ToString().Replace(";\r\n", ", ").Replace(";\n", ", ").TrimEnd(',', ' ', '\r', '\n', ';');
+        }
+
+        private string EmitForInitClause(NodeData forNode)
+        {
+            if (forNode.InitSubGraph != null && forNode.InitSubGraph.Nodes.Count > 0)
+                return GenerateForClauseFromSubGraph(forNode.InitSubGraph);
+
             var initEdge = _graph.Edges.FirstOrDefault(
-                e => e.ToNodeId == forId && e.ToPort == "init");
+                e => e.ToNodeId == forNode.Id && e.ToPort == "init");
             if (initEdge == null)
                 return "";
 
@@ -466,10 +477,13 @@ namespace VisualScripting.Core.Generators
             return EmitStmtExpr(fromId);
         }
 
-        private string EmitForIncrementClause(string forId)
+        private string EmitForIncrementClause(NodeData forNode)
         {
+            if (forNode.IncrementSubGraph != null && forNode.IncrementSubGraph.Nodes.Count > 0)
+                return GenerateForClauseFromSubGraph(forNode.IncrementSubGraph);
+
             var incEdge = _graph.Edges.FirstOrDefault(
-                e => e.ToNodeId == forId && e.ToPort == "increment");
+                e => e.ToNodeId == forNode.Id && e.ToPort == "increment");
             if (incEdge == null)
                 return "";
 

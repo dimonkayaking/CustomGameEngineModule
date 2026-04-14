@@ -14,6 +14,8 @@ namespace VisualScripting.Core.Models
 
         public GraphData ConditionSubGraph { get; set; }
         public GraphData BodySubGraph { get; set; }
+        public GraphData InitSubGraph { get; set; }
+        public GraphData IncrementSubGraph { get; set; }
 
         /// <summary>
         /// Хранит исходное выражение (например "x + y") для корректной генерации кода

@@ -609,7 +609,11 @@ namespace VisualScripting.Core.Parsers
             if (prevNode != null)
                 AddEdge(prevNode, prevPort, forId, PortIds.ExecIn);
 
-            VisitForInitialization(forStmt, forId);
+            var initGraph = new GraphData();
+            PushSubGraph(initGraph);
+            VisitForInitialization(forStmt);
+            PopSubGraph();
+            forNodeData.InitSubGraph = initGraph;
 
             var condGraph = new GraphData();
             if (forStmt.Condition != null)
@@ -620,12 +624,14 @@ namespace VisualScripting.Core.Parsers
             }
             forNodeData.ConditionSubGraph = condGraph;
 
+            var incGraph = new GraphData();
+            PushSubGraph(incGraph);
             foreach (var inc in forStmt.Incrementors)
             {
-                var incRoot = VisitIncrementExpression(inc, out var ui);
-                if (!ui && incRoot != null)
-                    AddEdge(incRoot, GetDataOutPortForNodeId(incRoot), forId, "increment");
+                VisitIncrementExpression(inc, out _);
             }
+            PopSubGraph();
+            forNodeData.IncrementSubGraph = incGraph;
 
             var bodyGraph = new GraphData();
             PushSubGraph(bodyGraph);
@@ -639,7 +645,7 @@ namespace VisualScripting.Core.Parsers
             return new FlowHost { NodeId = forId, ExecOutPort = PortIds.ExecOut };
         }
 
-        private void VisitForInitialization(ForStatementSyntax forStmt, string forId)
+        private void VisitForInitialization(ForStatementSyntax forStmt)
         {
             if (forStmt.Declaration != null)
             {
@@ -655,7 +661,6 @@ namespace VisualScripting.Core.Parsers
                         continue;
 
                     _symbolToNodeId[name] = rootId;
-                    AddEdge(rootId, GetDataOutPortForNodeId(rootId), forId, "init");
                 }
             }
 
@@ -684,13 +689,10 @@ namespace VisualScripting.Core.Parsers
                     }
                     
                     _symbolToNodeId[n] = litId;
-                    AddEdge(litId, GetDataOutPortForNodeId(litId), forId, "init");
                     continue;
                 }
 
-                var rid = VisitExpression(initExpr, false, null, out var u2);
-                if (!u2 && rid != null)
-                    AddEdge(rid, GetDataOutPortForNodeId(rid), forId, "init");
+                VisitExpression(initExpr, false, null, out _);
             }
         }
 
@@ -714,6 +716,13 @@ namespace VisualScripting.Core.Parsers
                 return BuildIncrementSubgraph(idPre, pre.IsKind(SyntaxKind.PreIncrementExpression), out unsupported);
             }
 
+            if (expr is AssignmentExpressionSyntax assign &&
+                assign.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                assign.Left is IdentifierNameSyntax)
+            {
+                return BuildIncrementAssignmentSubgraph(assign, out unsupported);
+            }
+
             return VisitExpression(expr, false, null, out unsupported);
         }
 
@@ -721,12 +730,22 @@ namespace VisualScripting.Core.Parsers
         {
             unsupported = false;
             var name = id.Identifier.Text;
-            if (!_symbolToNodeId.TryGetValue(name, out var varNodeId))
+            
+            string varNodeId;
+            if (_inSubGraph && _symbolToNodeId.ContainsKey(name))
+            {
+                varNodeId = CreateVariableRefInSubGraph(name);
+            }
+            else if (!_symbolToNodeId.TryGetValue(name, out var temp))
             {
                 unsupported = true;
                 _errors.Add(
                     $"Неизвестная переменная «{name}» ({FormatUserLocation(id.SyntaxTree, id.Span)}).");
                 return null;
+            }
+            else
+            {
+                varNodeId = temp;
             }
 
             var oneId = CreateLiteralIntOne();
@@ -745,11 +764,47 @@ namespace VisualScripting.Core.Parsers
 
             var vType = _variableTypes.TryGetValue(name, out var t) ? t : "int";
             var litId = CreateDefaultLiteralNode(vType, name);
+            var litNode = _graph.Nodes.FirstOrDefault(n => n.Id == litId);
+            if (litNode != null)
+                litNode.Value = "?";
             
             AddEdge(opId, "output", litId, "inputValue");
             _symbolToNodeId[name] = litId;
 
             return opId;
+        }
+
+        private string BuildIncrementAssignmentSubgraph(AssignmentExpressionSyntax assign, out bool unsupported)
+        {
+            unsupported = false;
+            if (assign.Left is not IdentifierNameSyntax idLeft)
+            {
+                unsupported = true;
+                return null;
+            }
+
+            var name = idLeft.Identifier.Text;
+            if (!_symbolToNodeId.ContainsKey(name))
+            {
+                unsupported = true;
+                _errors.Add(
+                    $"Неизвестная переменная «{name}» ({FormatUserLocation(assign.SyntaxTree, assign.Span)}).");
+                return null;
+            }
+
+            var rhsId = VisitExpression(assign.Right, false, null, out unsupported);
+            if (unsupported || rhsId == null)
+                return null;
+
+            var vType = _variableTypes.TryGetValue(name, out var t) ? t : "int";
+            var litId = CreateDefaultLiteralNode(vType, name);
+            var litNode = _graph.Nodes.FirstOrDefault(n => n.Id == litId);
+            if (litNode != null)
+                litNode.Value = "?";
+
+            AddEdge(rhsId, GetDataOutPortForNodeId(rhsId), litId, "inputValue");
+            _symbolToNodeId[name] = litId;
+            return litId;
         }
 
         private FlowHost VisitWhileStatement(WhileStatementSyntax whileStmt, string prevNode, string prevPort)

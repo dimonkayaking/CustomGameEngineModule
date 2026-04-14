@@ -8,7 +8,9 @@ namespace CustomVisualScripting.Editor.Nodes.Views
     public class ForNodeView : BaseNodeView
     {
         private ForNode _node;
+        private SubGraphPanel _initPanel;
         private SubGraphPanel _conditionPanel;
+        private SubGraphPanel _incrementPanel;
         private SubGraphPanel _bodyPanel;
         private VisualElement _panelsContainer;
         private Label _collapseToggle;
@@ -45,14 +47,30 @@ namespace CustomVisualScripting.Editor.Nodes.Views
             titleContainer.Add(_collapseToggle);
 
             _panelsContainer = new VisualElement();
-            _panelsContainer.style.minWidth = 350;
+            _panelsContainer.style.minWidth = 600;
 
-            _conditionPanel = new SubGraphPanel(
-                "\u0423\u0441\u043B\u043E\u0432\u0438\u0435",
-                _node.conditionSubGraph,
-                true);
+            var conditionsRow = new VisualElement();
+            conditionsRow.style.flexDirection = FlexDirection.Row;
+            conditionsRow.style.justifyContent = Justify.SpaceBetween;
+
+            _initPanel = new SubGraphPanel("Объявление", _node.initSubGraph, false);
+            _initPanel.style.flexGrow = 1;
+            _initPanel.style.marginRight = 4;
+            _initPanel.OnChanged += OnSubGraphChanged;
+            conditionsRow.Add(_initPanel);
+
+            _conditionPanel = new SubGraphPanel("Граница", _node.conditionSubGraph, true);
+            _conditionPanel.style.flexGrow = 1;
+            _conditionPanel.style.marginRight = 4;
             _conditionPanel.OnChanged += OnSubGraphChanged;
-            _panelsContainer.Add(_conditionPanel);
+            conditionsRow.Add(_conditionPanel);
+
+            _incrementPanel = new SubGraphPanel("Шаг", _node.incrementSubGraph, false);
+            _incrementPanel.style.flexGrow = 1;
+            _incrementPanel.OnChanged += OnSubGraphChanged;
+            conditionsRow.Add(_incrementPanel);
+
+            _panelsContainer.Add(conditionsRow);
 
             _bodyPanel = new SubGraphPanel(
                 "\u0422\u0435\u043B\u043E",
@@ -75,7 +93,9 @@ namespace CustomVisualScripting.Editor.Nodes.Views
 
         private void OnSubGraphChanged()
         {
+            _node.initSubGraph = _initPanel.SubGraph;
             _node.conditionSubGraph = _conditionPanel.SubGraph;
+            _node.incrementSubGraph = _incrementPanel.SubGraph;
             _node.bodySubGraph = _bodyPanel.SubGraph;
         }
     }
